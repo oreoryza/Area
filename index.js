@@ -1580,7 +1580,6 @@ function initCustomCursor() {
    4. INIT PAGE
 ========================================= */
 
-
 function initPage(container, { initial = false } = {}) {
   if (!container) return () => {};
 
@@ -1591,7 +1590,6 @@ function initPage(container, { initial = false } = {}) {
   // =====================================
 
   const ctx = gsap.context(() => {
-
     // =====================================
     // PRELOADER
     // Initial page load only
@@ -1620,26 +1618,6 @@ function initPage(container, { initial = false } = {}) {
     });
 
     // =====================================
-    // LINE REVEAL
-    // =====================================
-
-    const lineRevealCleanup = initLineReveal(container);
-
-    if (lineRevealCleanup) {
-      cleanups.push(lineRevealCleanup);
-    }
-
-    // =====================================
-    // STAGGER REVEAL
-    // =====================================
-
-    const staggerRevealCleanup = initStaggerReveal(container);
-
-    if (staggerRevealCleanup) {
-      cleanups.push(staggerRevealCleanup);
-    }
-
-    // =====================================
     // WORK HOVER
     // =====================================
 
@@ -1652,7 +1630,6 @@ function initPage(container, { initial = false } = {}) {
     // ---------------------------------
     // ADD MORE ANIMATIONS HERE
     // ---------------------------------
-
   }, container);
 
   // =====================================
@@ -1668,6 +1645,28 @@ function initPage(container, { initial = false } = {}) {
   };
 }
 
+/* =========================================
+   SCROLL ANIMATIONS
+========================================= */
+
+function initScrollAnimations(container) {
+  if (!container) return () => {};
+
+  const cleanups = [];
+
+  // LINE REVEAL
+  cleanups.push(initLineReveal(container));
+
+  // STAGGER REVEAL
+  cleanups.push(initStaggerReveal(container));
+
+  // CLEANUP
+  return () => {
+    cleanups.reverse().forEach((cleanup) => {
+      cleanup?.();
+    });
+  };
+}
 
 /* =========================================
    5. WEBFLOW DOCUMENT UPDATE
@@ -1747,6 +1746,8 @@ function initBarba() {
   // =====================================
 
   let destroyCurrentPage = initPage(initialContainer);
+
+  let destroyScrollAnimations = initScrollAnimations(initialContainer);
 
   // =====================================
   // BARBA INIT
@@ -1829,8 +1830,10 @@ function initBarba() {
             () => {
               // Destroy old page
               destroyCurrentPage();
+              destroyScrollAnimations();
 
               destroyCurrentPage = () => {};
+              destroyScrollAnimations = () => {};
 
               // Update Webflow
               destroyWebflow();
@@ -1899,6 +1902,9 @@ function initBarba() {
 
           // Update scrollbar dimensions
           fixedScrollbar?.update();
+
+          // Initialize scroll animations
+          destroyScrollAnimations = initScrollAnimations(next.container);
 
           // Refresh ScrollTrigger
           ScrollTrigger?.refresh();
