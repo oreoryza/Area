@@ -2,7 +2,38 @@
    SMOOTH SCROLL - LENIS
 ========================================= */
 
+if ("scrollRestoration" in history) {
+  history.scrollRestoration = "manual";
+}
+
 let lenisInstance = null;
+
+function resetPageScrollPosition(event) {
+  if (event?.persisted) return;
+
+  const root = document.documentElement;
+  const reset = () => {
+    if (lenisInstance) {
+      lenisInstance.scrollTo(0, {
+        immediate: true,
+        force: true,
+      });
+    }
+
+    window.scrollTo(0, 0);
+    root.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  };
+
+  reset();
+  requestAnimationFrame(reset);
+}
+
+window.addEventListener("pageshow", resetPageScrollPosition);
+
+if (document.readyState === "complete") {
+  resetPageScrollPosition();
+}
 
 function initSmoothScroll() {
   // Prevent duplicate initialization
@@ -27,17 +58,13 @@ function initSmoothScroll() {
     anchors: true,
   });
 
-  // =====================================
   // GSAP TICKER INTEGRATION
-  // =====================================
 
   gsap.ticker.add((time) => {
     lenisInstance.raf(time * 1000);
   });
 
-  // =====================================
   // SCROLLTRIGGER INTEGRATION
-  // =====================================
 
   if (window.ScrollTrigger) {
     lenisInstance.on("scroll", window.ScrollTrigger.update);
@@ -59,9 +86,7 @@ function initFixedScrollbar(lenis) {
   // Prevent duplicate scrollbar
   document.querySelector(".lenis-scrollbar")?.remove();
 
-  // =====================================
   // CREATE ELEMENTS
-  // =====================================
 
   const track = document.createElement("div");
   const thumb = document.createElement("div");
@@ -81,9 +106,7 @@ function initFixedScrollbar(lenis) {
   track.appendChild(thumb);
   document.body.appendChild(track);
 
-  // =====================================
   // VARIABLES
-  // =====================================
 
   const minThumbHeight = 40;
 
@@ -91,9 +114,7 @@ function initFixedScrollbar(lenis) {
   let startY = 0;
   let startTop = 0;
 
-  // =====================================
   // UPDATE SCROLLBAR
-  // =====================================
 
   function update() {
     const trackHeight = track.clientHeight;
@@ -132,9 +153,7 @@ function initFixedScrollbar(lenis) {
     track.setAttribute("aria-valuenow", Math.round(progress * 100));
   }
 
-  // =====================================
   // TRACK CLICK
-  // =====================================
 
   function onTrackClick(event) {
     if (event.target === thumb) return;
@@ -157,9 +176,7 @@ function initFixedScrollbar(lenis) {
     lenis.scrollTo(progress * lenis.limit);
   }
 
-  // =====================================
   // DRAG START
-  // =====================================
 
   function onDragStart(event) {
     event.preventDefault();
@@ -174,9 +191,7 @@ function initFixedScrollbar(lenis) {
     thumb.setPointerCapture(event.pointerId);
   }
 
-  // =====================================
   // DRAG MOVE
-  // =====================================
 
   function onDragMove(event) {
     if (!isDragging) return;
@@ -200,17 +215,13 @@ function initFixedScrollbar(lenis) {
     });
   }
 
-  // =====================================
   // DRAG END
-  // =====================================
 
   function onDragEnd() {
     isDragging = false;
   }
 
-  // =====================================
   // KEYBOARD SUPPORT
-  // =====================================
 
   function onKeyDown(event) {
     const current = lenis.scroll;
@@ -253,9 +264,7 @@ function initFixedScrollbar(lenis) {
     lenis.scrollTo(target);
   }
 
-  // =====================================
   // EVENTS
-  // =====================================
 
   lenis.on("scroll", update);
 
@@ -273,9 +282,7 @@ function initFixedScrollbar(lenis) {
   // Initial update
   update();
 
-  // =====================================
   // PUBLIC METHODS
-  // =====================================
 
   return {
     update,
@@ -300,281 +307,281 @@ function initFixedScrollbar(lenis) {
 }
 
 /* =========================================
-   1. GENERATE PIXELS
-========================================= */
-
-function generatePixels(root) {
-  const pixelContainers = root.matches?.(".preload-bg")
-    ? [root, ...root.querySelectorAll(".preload-bg")]
-    : [...root.querySelectorAll(".preload-bg")];
-
-  pixelContainers.forEach((pixelContainer) => {
-    const pixelSize = 40;
-
-    const width = pixelContainer.clientWidth;
-    const height = pixelContainer.clientHeight;
-
-    if (!width || !height) return;
-
-    const cols = Math.ceil(width / pixelSize);
-    const rows = Math.ceil(height / pixelSize);
-
-    pixelContainer.innerHTML = "";
-
-    pixelContainer.dataset.cols = cols;
-    pixelContainer.dataset.rows = rows;
-
-    pixelContainer.style.display = "grid";
-    pixelContainer.style.gridTemplateColumns = `repeat(${cols}, ${pixelSize}px)`;
-    pixelContainer.style.gridAutoRows = `${pixelSize}px`;
-    pixelContainer.style.gap = "0";
-    pixelContainer.style.overflow = "hidden";
-
-    for (let i = 0; i < cols * rows; i++) {
-      const pixel = document.createElement("div");
-
-      pixel.style.width = `${pixelSize}px`;
-      pixel.style.height = `${pixelSize}px`;
-      pixel.style.backgroundColor = "transparent";
-
-      pixelContainer.appendChild(pixel);
-    }
-  });
-}
-
-/* =========================================
-   PIXEL ZIPPER ORDER
-   Bottom/Top Rows + Odd/Even Columns
-========================================= */
-
-function getZipperPixelOrder(pixelContainer, { direction = "bottom" } = {}) {
-  const pixels = Array.from(pixelContainer.children);
-
-  const cols = Number(pixelContainer.dataset.cols);
-  const rows = Number(pixelContainer.dataset.rows);
-
-  if (!pixels.length || !cols || !rows) {
-    return {
-      pixels: [],
-      stagger: () => () => 0,
-    };
-  }
-
-  // =====================================
-  // ORDER MAP
-  // =====================================
-
-  const orderMap = new Map();
-  const maxOrder = Math.max(rows * 2 - 1, 1);
-
-  pixels.forEach((pixel, index) => {
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-
-    // 1-based column:
-    // col 0 => column 1 (odd)
-    // col 1 => column 2 (even)
-    const isEvenColumn = (col + 1) % 2 === 0;
-
-    // Row progression:
-    // bottom => bottom row starts at 0
-    // top => top row starts at 0
-    const rowProgress = direction === "bottom" ? rows - 1 - row : row;
-
-    // Interleaved order:
-    // odd columns first, even columns second
-    const order = rowProgress * 2 + (isEvenColumn ? 1 : 0);
-
-    orderMap.set(pixel, order);
-  });
-
-  // =====================================
-  // STAGGER
-  // =====================================
-
-  function stagger(amount = 1, reverse = false) {
-    return (index, target) => {
-      const order = orderMap.get(target) ?? 0;
-
-      const progress = maxOrder > 0 ? order / maxOrder : 0;
-
-      return (reverse ? 1 - progress : progress) * amount;
-    };
-  }
-
-  // =====================================
-  // RETURN
-  // =====================================
-
-  return {
-    pixels,
-    stagger,
-  };
-}
-
-/* =========================================
-   2. ANIMATE PRELOAD
+   PRELOAD ANIMATION
 ========================================= */
 
 function animatePreload(root) {
   const wrap = root.querySelector(".preload-wrap");
-  const page = root.querySelector(".page-main");
-  const logo = root.querySelector(".preload-logo");
-  const pixelContainer = root.querySelector(".preload-bg");
+  if (!wrap) return null;
 
-  if (!wrap || !logo || !pixelContainer) return null;
+  const logo = wrap.querySelector(".preload-logo");
+  const bg = wrap.querySelector(".preload-bg");
+  const vLinesWrap = wrap.querySelector(".preload-lines-vertical");
+  const vLine = wrap.querySelector(".preload-line-v");
+  const hLinesWrap = wrap.querySelector(".preload-lines-horizontal");
+  const hLine = wrap.querySelector(".preload-line-h");
 
-  const pixels = Array.from(pixelContainer.children);
+  const logoLetters = logo
+    ? Array.from(logo.querySelectorAll(":scope > div"))
+    : [];
 
-  const cols = Number(pixelContainer.dataset.cols);
-  const rows = Number(pixelContainer.dataset.rows);
+  const eLetter = logo?.querySelector("[data-turn-e]");
 
-  if (!pixels.length || !cols || !rows) return null;
+  // Duration settings
+  const LINES_INTRO_DURATION = 0.8;
 
-  // SPLIT TEXT
-  const split = SplitText.create(logo, {
-    type: "lines",
-    mask: "lines",
+  const SCALE_DURATION = 0.8;
+
+  const LETTER_IN_DURATION = 0.5;
+  const LETTER_IN_STAGGER = 0.06;
+
+  const EXPAND_DURATION = 0.8;
+  const FLIP_DURATION = 0.8;
+
+  const LETTER_OUT_DURATION = 0.4;
+
+  const EXIT_DURATION = 0.8;
+
+  // SplitText: Letter + Mask
+  const logoSplits = logoLetters.map((letter) =>
+    SplitText.create(letter, {
+      type: "chars",
+      mask: "chars",
+    }),
+  );
+
+  const logoChars = logoSplits.flatMap((split) => split.chars);
+
+  // Calculate phase durations
+  const LETTER_IN_TOTAL =
+    LETTER_IN_DURATION + Math.max(0, logoChars.length - 1) * LETTER_IN_STAGGER;
+
+  const PHASE_0_DURATION = vLinesWrap || hLinesWrap ? LINES_INTRO_DURATION : 0;
+
+  const PHASE_1_DURATION = Math.max(SCALE_DURATION, LETTER_IN_TOTAL);
+
+  const PHASE_2_DURATION = Math.max(EXPAND_DURATION, FLIP_DURATION);
+
+  const PHASE_1_START = PHASE_0_DURATION;
+
+  const PHASE_2_START = PHASE_1_START + PHASE_1_DURATION;
+
+  const PHASE_3_START = PHASE_2_START + PHASE_2_DURATION;
+
+  gsap.set(wrap, {
+    clipPath: "inset(0% 0% 0% 0%)",
+    pointerEvents: "auto",
   });
-
-  // INITIAL STATE
-  // gsap.set(wrap, {
-  //   position: "fixed",
-  //   clipPath: "inset(0% 0% 0% 0%)",
-  // });
 
   gsap.set(logo, {
     opacity: 1,
   });
 
-  gsap.set(split.lines, {
-    yPercent: 110,
+  // Initial letter position
+  if (logoChars.length) {
+    gsap.set(logoChars, {
+      yPercent: 100,
+    });
+  }
+
+  // Prepare E letter for 3D rotation
+  if (eLetter) {
+    gsap.set(eLetter, {
+      rotationY: 0,
+      transformPerspective: 800,
+      transformOrigin: "50% 50%",
+      backfaceVisibility: "visible",
+      force3D: true,
+    });
+  }
+
+  const tl = gsap.timeline({
+    delay: 0.5,
+    onComplete() {
+      logoSplits.forEach((split) => split.revert());
+
+      gsap.set(wrap, {
+        autoAlpha: 0,
+        pointerEvents: "none",
+      });
+    },
   });
 
-  // PIXEL INITIAL STATE
-  gsap.set(pixels, {
-    backgroundColor: "transparent",
-    opacity: 0,
-    scale: 0.85,
-    transformOrigin: "center center",
-  });
+  // ==================================
+  // PHASE 0: LINE INTRO
+  // ==================================
 
-  // ZIPPER PIXEL ORDER
+  tl.addLabel("phase0", 0);
 
-  const zipperTop = getZipperPixelOrder(pixelContainer, { direction: "top" });
-  const zipperBottom = getZipperPixelOrder(pixelContainer, {
-    direction: "bottom",
-  });
+  if (vLinesWrap) {
+    tl.to(
+      vLinesWrap,
+      {
+        width: "24em",
+        duration: LINES_INTRO_DURATION,
+        ease: "power2.out",
+      },
+      "phase0",
+    );
+  }
 
-  const topPixels = zipperTop.pixels;
-  const bottomPixels = zipperBottom.pixels;
+  if (hLinesWrap) {
+    tl.to(
+      hLinesWrap,
+      {
+        height: "24em",
+        duration: LINES_INTRO_DURATION,
+        ease: "power2.out",
+      },
+      "phase0",
+    );
+  }
 
-  // MAIN TIMELINE
-  const tl = gsap.timeline();
+  // ==================================
+  // PHASE 1: SCALE + LETTER REVEAL
+  // ==================================
 
-  // 02. CINEMATIC PIXEL ZIPPER
+  tl.addLabel("phase1", PHASE_1_START);
+
+  if (bg) {
+    tl.to(
+      bg,
+      {
+        scale: 1,
+        duration: SCALE_DURATION,
+        ease: "power2.out",
+      },
+      "phase1",
+    );
+  }
+
+  if (vLine) {
+    tl.to(
+      vLine,
+      {
+        width: "100%",
+        duration: SCALE_DURATION,
+        ease: "power2.out",
+      },
+      "phase1",
+    );
+  }
+
+  if (hLine) {
+    tl.to(
+      hLine,
+      {
+        height: "100%",
+        duration: SCALE_DURATION,
+        ease: "power2.out",
+      },
+      "phase1",
+    );
+  }
+
+  if (logoChars.length) {
+    tl.to(
+      logoChars,
+      {
+        yPercent: 0,
+        duration: LETTER_IN_DURATION,
+        stagger: LETTER_IN_STAGGER,
+        ease: "power3.out",
+      },
+      "phase1",
+    );
+  }
+
+  // ==================================
+  // PHASE 2: BG EXPAND + E FLIP
+  // ==================================
+
+  tl.addLabel("phase2", PHASE_2_START);
+
+  if (bg) {
+    tl.to(
+      bg,
+      {
+        width: "101%",
+        height: "101%",
+        duration: EXPAND_DURATION,
+        ease: "power2.inOut",
+      },
+      "phase2",
+    );
+  }
+
+  if (vLinesWrap) {
+    tl.to(
+      vLinesWrap,
+      {
+        width: "100%",
+        duration: EXPAND_DURATION,
+        ease: "power2.inOut",
+      },
+      "phase2",
+    );
+  }
+
+  if (hLinesWrap) {
+    tl.to(
+      hLinesWrap,
+      {
+        height: "100%",
+        duration: EXPAND_DURATION,
+        ease: "power2.inOut",
+      },
+      "phase2",
+    );
+  }
+
+  if (eLetter) {
+    tl.to(
+      eLetter,
+      {
+        rotationY: 180,
+        duration: FLIP_DURATION,
+        ease: "power2.inOut",
+        force3D: true,
+      },
+      "phase2",
+    );
+  }
+
+  // ==================================
+  // PHASE 3: LOGO + WRAP EXIT
+  // ==================================
+
+  tl.addLabel("phase3", PHASE_3_START);
+
+  if (logo) {
+    tl.to(
+      logo,
+      {
+        scale: 0.8,
+        autoAlpha: 0.5,
+        duration: LETTER_OUT_DURATION,
+        ease: "power2.in",
+      },
+      "phase3",
+    );
+  }
+
   tl.to(
-    bottomPixels,
-    {
-      backgroundColor: "#000000",
-      opacity: 1,
-      scale: 1,
-      duration: 0.25,
-      ease: "power2.in",
-
-      stagger: zipperBottom.stagger(0.6),
-    },
-    "+=0.3",
-  );
-
-  // 01. LOGO REVEAL
-  tl.to(
-    split.lines,
-    {
-      yPercent: 0,
-      duration: 0.8,
-      ease: "power2.out",
-    },
-    "-=0.2",
-  );
-
-  tl.to(
-    page,
-    {
-      y: "20vh",
-    },
-    "<",
-  );
-
-  tl.set(
     wrap,
     {
-      backgroundColor: "transparent",
-    },
-    "+=0.5",
-  );
-
-  tl.to(
-    topPixels,
-    {
-      backgroundColor: "transparent",
-      opacity: 1,
-      scale: 1,
-      duration: 0.25,
-      ease: "power2.out",
-
-      stagger: zipperTop.stagger(0.6, true),
-    },
-    "<0.2",
-  );
-
-  tl.to(
-    split.lines,
-    {
-      yPercent: -100,
-      duration: 0.8,
-      ease: "power2.in",
-    },
-    "<-0.4",
-  );
-
-  tl.to(
-    page,
-    {
-      y: "0vh",
-      duration: 1,
-      ease: "power2.out",
-    },
-    "<",
-  );
-
-  // RESET PIXELS FOR FUTURE TRANSITIONS
-
-  tl.call(() => {
-    gsap.set(pixels, {
-      backgroundColor: "transparent",
-      opacity: 0,
-      scale: 0.85,
-    });
-
-    gsap.set(logo, {
-      autoAlpha: 0,
-    });
-
-    gsap.set(wrap, {
-      pointerEvents: "none",
-      backgroundColor: "transparent",
       clipPath: "inset(0% 0% 100% 0%)",
-    });
-
-    split.revert();
-  });
+      duration: EXIT_DURATION,
+      ease: "power2.inOut",
+    },
+    "phase3",
+  );
 
   return tl;
 }
 
 /* =========================================
-   3. HERO LAYOUT TOGGLE
+   1. HERO LAYOUT TOGGLE
 ========================================= */
 
 function initHeroLayoutToggle({
@@ -644,9 +651,7 @@ function initHeroLayoutToggle({
     paused: true,
   });
 
-  // ---------------------------------
   // PHASE 1
-  // ---------------------------------
 
   const phase1 = gsap.timeline();
 
@@ -682,9 +687,7 @@ function initHeroLayoutToggle({
 
   tl.add(phase1);
 
-  // ---------------------------------
   // PHASE 2
-  // ---------------------------------
 
   tl.to(
     line2Lines,
@@ -719,9 +722,7 @@ function initHeroLayoutToggle({
   // START IN REVERSED STATE
   tl.reversed(true);
 
-  // ---------------------------------
   // TOGGLE
-  // ---------------------------------
 
   const toggle = () => {
     tl.reversed() ? tl.play() : tl.reverse();
@@ -731,9 +732,7 @@ function initHeroLayoutToggle({
     element.addEventListener("click", toggle);
   });
 
-  // ---------------------------------
   // CLEANUP
-  // ---------------------------------
 
   return {
     timeline: tl,
@@ -754,222 +753,129 @@ function initHeroLayoutToggle({
 
 function createPageTransition(root = document) {
   const wrap = root.querySelector(".preload-wrap");
-  const logo = root.querySelector(".preload-logo");
-  const pixelContainer = root.querySelector(".preload-bg");
+  const logo = wrap?.querySelector(".preload-logo");
 
-  // PRELOAD TAG ELEMENTS
-  const tagWraps = Array.from(root.querySelectorAll(".preload-tag-wrap"));
-
-  const tagTexts = Array.from(root.querySelectorAll(".preload-tag .text-24"));
-
-  if (!wrap || !pixelContainer) {
-    console.warn("Page transition elements not found");
-
-    return {
-      cover: () => gsap.timeline(),
-      reveal: () => gsap.timeline(),
-    };
-  }
-
-  const pixels = Array.from(pixelContainer.children);
-
-  const cols = Number(pixelContainer.dataset.cols);
-  const rows = Number(pixelContainer.dataset.rows);
-
-  if (!pixels.length || !cols || !rows) {
-    return {
-      cover: () => gsap.timeline(),
-      reveal: () => gsap.timeline(),
-    };
-  }
-
-  // ZIPPER PIXEL ORDER
-
-  const zipperTop = getZipperPixelOrder(pixelContainer, { direction: "top" });
-  const zipperBottom = getZipperPixelOrder(pixelContainer, {
-    direction: "bottom",
+  const createEmptyTransition = () => ({
+    cover: () => gsap.timeline(),
+    reveal: () => gsap.timeline(),
   });
 
-  const topPixels = zipperTop.pixels;
-  const bottomPixels = zipperBottom.pixels;
+  if (!wrap) {
+    console.warn("Page transition elements not found");
+    return createEmptyTransition();
+  }
 
-  // =====================================
+  // Duration settings
+  const PAGE_DURATION = 1;
+  const WIPE_DURATION = 0.8;
+
+  // ==================================
   // COVER CURRENT PAGE
-  // =====================================
+  // ==================================
 
   function cover(page, nextPageName = "") {
     const tl = gsap.timeline();
 
+    // Reset wrap to hidden state
     tl.set(wrap, {
       autoAlpha: 1,
-      clipPath: "inset(0% 0% 0% 0%)",
+      clipPath: "inset(100% 0% 0% 0%)",
+      backgroundColor: "#000000",
       pointerEvents: "auto",
     });
 
+    // Hide logo
     if (logo) {
-      tl.set(logo, {
-        autoAlpha: 0,
-      });
-    }
-
-    tl.set(bottomPixels, {
-      backgroundColor: "transparent",
-      opacity: 0,
-      scale: 0.85,
-    });
-
-    // 01. PIXEL COVER
-
-    tl.to(
-      bottomPixels,
-      {
-        backgroundColor: "#000000",
-        opacity: 1,
-        scale: 1,
-
-        duration: 0.2,
-        ease: "power2.out",
-
-        stagger: zipperBottom.stagger(0.8),
-      },
-      0,
-    );
-
-    // 02. PRELOAD TAG REVEAL
-
-    if (tagWraps.length) {
       tl.set(
-        tagWraps,
+        logo,
         {
-          yPercent: 100,
-        },
-        0,
-      );
-
-      tl.to(
-        tagWraps,
-        {
-          yPercent: 0,
-
-          duration: 0.8,
-          ease: "power4.out",
+          autoAlpha: 0,
         },
         0,
       );
     }
 
-    // 03. SCRAMBLE TEXT
-
-    if (nextPageName && tagTexts.length) {
-      tl.to(
-        tagTexts,
-        {
-          duration: 0.8,
-
-          scrambleText: {
-            text: nextPageName,
-            chars: "upperAndLowerCase",
-            revealDelay: 0.2,
-            speed: 0.3,
-          },
-
-          ease: "none",
-        },
-        0,
-      );
-    }
-
-    // 04. CURRENT PAGE MOVEMENT
-
+    // Page moves upward
     if (page) {
       tl.to(
         page,
         {
           y: "-20vh",
-
-          duration: 1,
+          duration: PAGE_DURATION,
           ease: "power2.in",
         },
         0,
       );
     }
 
+    // Wrap reveals from top to bottom
+    tl.to(
+      wrap,
+      {
+        clipPath: "inset(0% 0% 0% 0%)",
+        duration: WIPE_DURATION,
+        ease: "power2.inOut",
+      },
+      0,
+    );
+
     return tl;
   }
 
-  // =====================================
+  // ==================================
   // REVEAL NEXT PAGE
-  // =====================================
+  // ==================================
 
   function reveal(page) {
     const tl = gsap.timeline({
       onComplete() {
         gsap.set(wrap, {
-          clipPath: "inset(0% 0% 100% 0%)",
+          autoAlpha: 0,
           pointerEvents: "none",
         });
       },
     });
 
-    // 01. PRELOAD TAG REVEAL
+    // Ensure wrap is fully covering the screen
+    tl.set(wrap, {
+      autoAlpha: 1,
+      clipPath: "inset(0% 0% 0% 0%)",
+      pointerEvents: "auto",
+    });
 
-    if (tagWraps.length) {
-      tl.set(
-        tagWraps,
-        {
-          yPercent: 0,
-        },
-        0,
-      );
-
-      tl.to(
-        tagWraps,
-        {
-          yPercent: 100,
-
-          duration: 0.8,
-          ease: "power4.out",
-        },
-        0.2,
-      );
-    }
-
-    // 02. PIXEL REVEAL
-
-    tl.to(
-      topPixels,
-      {
-        backgroundColor: "transparent",
-        opacity: 0,
-        scale: 0.85,
-
-        duration: 0.2,
-        ease: "power2.in",
-
-        stagger: zipperTop.stagger(0.8, true),
-      },
-      0.2,
-    );
-
-    // 03. NEXT PAGE MOVEMENT
-
+    // Page enters from below
     if (page) {
-      tl.from(
+      tl.fromTo(
         page,
         {
           y: "20vh",
-
-          duration: 1,
+        },
+        {
+          y: 0,
+          duration: PAGE_DURATION,
           ease: "power2.out",
         },
-        0.2,
+        0,
       );
     }
+
+    // Wrap exits upward
+    tl.to(
+      wrap,
+      {
+        clipPath: "inset(0% 0% 100% 0%)",
+        duration: WIPE_DURATION,
+        ease: "power2.inOut",
+      },
+      0,
+    );
 
     return tl;
   }
 
+  // ==================================
   // PUBLIC METHODS
+  // ==================================
 
   return {
     cover,
@@ -1017,6 +923,10 @@ function initLineReveal(root = document) {
       // Disable original text-indent
       element.style.textIndent = "0px";
     }
+
+    gsap.set(element, {
+      opacity: 1,
+    });
 
     const split = SplitText.create(element, {
       type: "lines",
@@ -1071,6 +981,40 @@ function initLineReveal(root = document) {
   };
 }
 
+function initLineRevealOpacity(root = document) {
+  const splits = [];
+
+  root.querySelectorAll("[data-line-opacity]").forEach((element) => {
+    const split = SplitText.create(element, {
+      type: "words",
+      autoSplit: true,
+      onSplit(self) {
+        return gsap.fromTo(
+          self.words,
+          { opacity: 0.48 },
+          {
+            opacity: 1,
+            stagger: 0.75,
+            ease: "none",
+            scrollTrigger: {
+              trigger: element,
+              start: "50% bottom",
+              end: "50% top",
+              scrub: true,
+            },
+          },
+        );
+      },
+    });
+
+    splits.push(split);
+  });
+
+  return () => {
+    splits.forEach((split) => split.revert());
+  };
+}
+
 function initStaggerReveal(root = document) {
   const animations = [];
 
@@ -1078,6 +1022,10 @@ function initStaggerReveal(root = document) {
     const targets = wrapper.querySelectorAll('[data-stagger="target"]');
 
     if (!targets.length) return;
+
+    gsap.set(wrapper, {
+      opacity: 1,
+    });
 
     const animation = gsap.from(targets, {
       y: 40,
@@ -1105,9 +1053,2214 @@ function initStaggerReveal(root = document) {
   };
 }
 
+function initPeopleItemAnimation(root) {
+  const peopleItems = [
+    ...(root.matches?.(".people-item") ? [root] : []),
+    ...root.querySelectorAll(".people-item"),
+  ];
+  const imageWraps = [
+    ...(root.matches?.(".people-item-img-wrap") ? [root] : []),
+    ...root.querySelectorAll(".people-item-img-wrap"),
+  ];
+  const timelines = [];
+
+  imageWraps.forEach((imageWrap) => {
+    const peopleItem = imageWrap.closest(".people-item");
+    const peopleItemIndex = peopleItems.indexOf(peopleItem);
+    const nextPeopleItem =
+      peopleItemIndex >= 0 ? peopleItems[peopleItemIndex + 1] : null;
+
+    const timeline = gsap.timeline({
+      scrollTrigger: {
+        trigger: imageWrap,
+        ...(nextPeopleItem
+          ? {
+              endTrigger: nextPeopleItem,
+              end: () =>
+                `top ${parseFloat(getComputedStyle(nextPeopleItem).top) || 0}px`,
+            }
+          : {
+              end: () => `+=${window.innerHeight + imageWrap.offsetHeight}`,
+            }),
+        start: "top bottom",
+        scrub: true,
+      },
+    });
+
+    timeline.fromTo(
+      imageWrap,
+      { scale: 0, transformOrigin: "100% 0%" },
+      { scale: 1, duration: 0.5, ease: "none" },
+    );
+    timeline.set(imageWrap, { transformOrigin: "0% 0%" });
+    timeline.to(imageWrap, { scale: 0, duration: 0.5, ease: "none" });
+
+    timelines.push(timeline);
+  });
+
+  return () => {
+    timelines.forEach((timeline) => {
+      timeline.scrollTrigger?.kill();
+      timeline.kill();
+    });
+  };
+}
+
+function initWTAScale(root) {
+  const marquees = [
+    ...(root.matches?.(".wta-marquee") ? [root] : []),
+    ...root.querySelectorAll(".wta-marquee"),
+  ];
+  const animations = [];
+
+  marquees.forEach((marquee) => {
+    const animation = gsap.fromTo(
+      marquee,
+      { scale: 2.5, transformOrigin: "top left" },
+      {
+        scale: 1,
+        ease: "none",
+        scrollTrigger: {
+          trigger: marquee,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      },
+    );
+
+    animations.push(animation);
+  });
+
+  return () => {
+    animations.forEach((animation) => {
+      animation.scrollTrigger?.kill();
+      animation.kill();
+    });
+  };
+}
+
+function initWTARunning(root) {
+  const wrappers = [
+    ...(root.matches?.(".wta-running-wrap") ? [root] : []),
+    ...root.querySelectorAll(".wta-running-wrap"),
+  ];
+  const animations = [];
+
+  wrappers.forEach((wrapper) => {
+    const text = wrapper.querySelectorAll(".wta-running-text");
+
+    if (!text.length) return;
+
+    const animation = gsap.fromTo(
+      text,
+      { xPercent: 60 },
+      {
+        xPercent: -20,
+        ease: "none",
+        scrollTrigger: {
+          trigger: wrapper,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      },
+    );
+
+    animations.push(animation);
+  });
+
+  return () => {
+    animations.forEach((animation) => {
+      animation.scrollTrigger?.kill();
+      animation.kill();
+    });
+  };
+}
+
+function initDisciplinesRunning(root) {
+  const wrappers = [
+    ...(root.matches?.(".cs-running-wrap") ? [root] : []),
+    ...root.querySelectorAll(".cs-running-wrap"),
+  ];
+  const animations = [];
+
+  wrappers.forEach((wrapper) => {
+    const text = wrapper.querySelectorAll(".cs-running-text");
+
+    if (!text.length) return;
+
+    const animation = gsap.fromTo(
+      text,
+      { xPercent: 60 },
+      {
+        xPercent: -20,
+        ease: "none",
+        scrollTrigger: {
+          trigger: wrapper,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      },
+    );
+
+    animations.push(animation);
+  });
+
+  return () => {
+    animations.forEach((animation) => {
+      animation.scrollTrigger?.kill();
+      animation.kill();
+    });
+  };
+}
+
+function addSplitTextSequence({
+  target,
+  sources,
+  splitInstances,
+  cleanups,
+  duration = 0.8,
+}) {
+  if (!target || sources.length !== 4) return;
+
+  const parent = target.parentElement;
+  if (!parent) return;
+
+  const originalHTML = target.innerHTML;
+
+  // Set initial value
+  target.innerHTML = sources[0].innerHTML;
+
+  // Positioning context
+  if (getComputedStyle(parent).position === "static") {
+    gsap.set(parent, { position: "relative" });
+  }
+
+  const targetRect = target.getBoundingClientRect();
+  const parentRect = parent.getBoundingClientRect();
+
+  const top =
+    targetRect.top -
+    parentRect.top -
+    (parseFloat(getComputedStyle(parent).borderTopWidth) || 0) +
+    parent.scrollTop;
+
+  const left =
+    targetRect.left -
+    parentRect.left -
+    (parseFloat(getComputedStyle(parent).borderLeftWidth) || 0) +
+    parent.scrollLeft;
+
+  const layers = sources.map((source, index) => {
+    const element = index === 0 ? target : target.cloneNode(false);
+
+    if (index > 0) {
+      element.innerHTML = source.innerHTML;
+
+      element.removeAttribute("id");
+      element.removeAttribute("data-fd-text");
+      element.setAttribute("aria-hidden", "true");
+
+      parent.appendChild(element);
+
+      gsap.set(element, {
+        position: "absolute",
+        top,
+        left,
+        width: targetRect.width,
+        margin: 0,
+        pointerEvents: "none",
+      });
+    }
+
+    const split = new SplitText(element, {
+      type: "lines",
+      mask: "lines",
+    });
+
+    splitInstances.push(split);
+
+    return {
+      element,
+      lines: split.lines,
+    };
+  });
+
+  // Initial states
+  layers.forEach(({ lines }) => {
+    gsap.set(lines, {
+      yPercent: 100,
+    });
+  });
+
+  let currentIndex = -1;
+  const allLines = layers.flatMap(({ lines }) => lines);
+
+  const animateToStage = (index) => {
+    if (index === currentIndex) return;
+
+    const previousIndex = currentIndex;
+    const direction = index > previousIndex ? 1 : -1;
+
+    gsap.killTweensOf(allLines);
+
+    layers.forEach(({ lines }, layerIndex) => {
+      const yPercent =
+        layerIndex === previousIndex
+          ? 0
+          : index >= 0 &&
+              (layerIndex < index ||
+                (layerIndex === index && direction < 0))
+            ? -100
+            : 100;
+
+      gsap.set(lines, { yPercent });
+    });
+
+    if (previousIndex >= 0) {
+      gsap.to(layers[previousIndex].lines, {
+        yPercent: index < 0 ? 100 : direction > 0 ? -100 : 100,
+        duration,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+    }
+
+    if (index >= 0) {
+      gsap.to(layers[index].lines, {
+        yPercent: 0,
+        duration,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+    }
+
+    currentIndex = index;
+  };
+
+  // Cleanup
+  cleanups.push(() => {
+    gsap.killTweensOf(allLines);
+
+    layers.slice(1).forEach(({ element }) => {
+      element.remove();
+    });
+
+    target.innerHTML = originalHTML;
+  });
+
+  return animateToStage;
+}
+
+function initDisciplineScroll(root = document) {
+  const scope = typeof root === "string" ? document.querySelector(root) : root;
+
+  if (!scope) return () => {};
+
+  const rails = scope.matches?.(".cs-rail")
+    ? [scope]
+    : Array.from(scope.querySelectorAll(".cs-rail"));
+
+  const cleanups = [];
+
+  rails.forEach((rail) => {
+    const wrap = rail.querySelector(".cs-wrap");
+    const card = wrap?.querySelector(".cs-card");
+    const imgList = wrap?.querySelector(".cs-img-list");
+    const imgWrap = card?.querySelector("[data-fd-img]");
+
+    if (!card || !imgList) return;
+
+    const imageGroups = [
+      ...new Set([
+        ...card.querySelectorAll(".cs-card-bottom-img-wrap, [data-fd-img]"),
+        imgList,
+      ]),
+    ].filter(
+      (element, index, elements) =>
+        !elements.some(
+          (other, otherIndex) =>
+            otherIndex !== index && other.contains(element),
+        ),
+    );
+    const imageSequences = imageGroups.map((group) => {
+      if (group.matches("img")) return [group];
+
+      const images = Array.from(group.querySelectorAll("img"));
+      if (images.length === 4) return images;
+
+      const children = Array.from(group.children);
+      return children.length === 4 ? children : [group];
+    });
+    const splitInstances = [];
+    const sequenceCleanups = [];
+    const stageAnimations = [];
+
+    const headLines = [];
+    const textLines = [];
+
+    // =================================
+    // DYNAMIC TEXT CONFIG
+    // =================================
+
+    const textSequences = [
+      {
+        target: card.querySelector(".cs-card-grid-text .text-32"),
+        sources: Array.from(rail.querySelectorAll(".cs-text-list .text-32")),
+      },
+      {
+        target: card.querySelector(".cs-card-number .tc-geist-mono .text-16"),
+        sources: Array.from(
+          rail.querySelectorAll(".cs-card-number-list .text-16"),
+        ),
+      },
+      {
+        target: card.querySelector(".cs-card-bottom-title .h1"),
+        sources: Array.from(
+          rail.querySelectorAll(".cs-card-bottom-title-list .h1"),
+        ),
+      },
+    ];
+
+    // Elements managed by dynamic sequence
+    const sequenceTargets = textSequences
+      .map(({ target }) => target)
+      .filter(Boolean);
+
+    const ctx = gsap.context(() => {
+      // =================================
+      // INITIAL STATES
+      // =================================
+
+      gsap.set(card, {
+        height: "7.125em",
+      });
+
+      // gsap.set(imgList, {
+      //   clipPath: "inset(50% 0% 50% 0%)",
+      // });
+
+      if (imgWrap) {
+        gsap.set(imgWrap, {
+          clipPath: "inset(100% 0% 0% 0%)",
+        });
+      }
+
+      gsap.set(imageSequences.map((images) => images[0]).filter(Boolean), {
+        clipPath: "inset(0% 0% 0% 0%)",
+      });
+
+      gsap.set(
+        imageSequences.flatMap((images) => images.slice(1, 4)),
+        {
+          clipPath: "inset(100% 0% 0% 0%)",
+        },
+      );
+
+      // =================================
+      // SPLIT HEAD
+      // =================================
+
+      card.querySelectorAll("[data-fd-head]").forEach((el) => {
+        const split = new SplitText(el, {
+          type: "lines",
+          mask: "lines",
+        });
+
+        splitInstances.push(split);
+        headLines.push(...split.lines);
+      });
+
+      // =================================
+      // SPLIT REGULAR TEXT
+      // Exclude dynamic sequence targets
+      // =================================
+
+      card.querySelectorAll("[data-fd-text]").forEach((el) => {
+        const isSequenceTarget = sequenceTargets.some(
+          (target) =>
+            el === target || el.contains(target) || target.contains(el),
+        );
+
+        if (isSequenceTarget) return;
+
+        const split = new SplitText(el, {
+          type: "lines",
+          mask: "lines",
+        });
+
+        splitInstances.push(split);
+        textLines.push(...split.lines);
+      });
+
+      // Initial states
+      gsap.set(headLines, {
+        yPercent: 0,
+      });
+
+      gsap.set(textLines, {
+        yPercent: 100,
+      });
+
+      // =================================
+      // MAIN TIMELINE
+      // =================================
+
+      const progress = { value: 0 };
+
+      const tl = gsap.timeline({
+        defaults: {
+          ease: "none",
+        },
+
+        scrollTrigger: {
+          trigger: rail,
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          invalidateOnRefresh: true,
+        },
+      });
+
+      // Fixed timeline duration: 5 units
+      tl.to(
+        progress,
+        {
+          value: 5,
+          duration: 5,
+        },
+        0,
+      );
+
+      // =================================
+      // STAGE 1 — 0% to 20%
+      // INITIAL REVEAL
+      // =================================
+
+      tl.to(
+        card,
+        {
+          height: "47.625em",
+          backgroundColor: "white",
+          duration: 1,
+        },
+        0,
+      );
+
+      tl.fromTo(
+        imgList,
+        {
+          clipPath: "inset(50% 0% 50% 0%)",
+        },
+        {
+          clipPath: "inset(0% 0% 0% 0%)",
+          duration: 1,
+        },
+        0,
+      );
+
+      if (imgWrap) {
+        tl.fromTo(
+          imgWrap,
+          {
+            clipPath: "inset(100% 0% 0% 0%)",
+          },
+          {
+            clipPath: "inset(0% 0% 0% 0%)",
+            duration: 1,
+          },
+          0,
+        );
+      }
+
+      imageSequences.forEach((images) => {
+        images.slice(1, 4).forEach((image, index) => {
+          tl.to(
+            image,
+            {
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: 1,
+            },
+            index + 1,
+          );
+        });
+      });
+
+      // =================================
+      // DYNAMIC TEXT SEQUENCES
+      // =================================
+
+      textSequences.forEach(({ target, sources }) => {
+        const animateToStage = addSplitTextSequence({
+          target,
+          sources,
+          splitInstances,
+          cleanups: sequenceCleanups,
+          duration: 0.8,
+        });
+
+        if (animateToStage) stageAnimations.push(animateToStage);
+      });
+
+      let activeStage = 0;
+
+      tl.eventCallback("onUpdate", () => {
+        const stage = Math.max(
+          0,
+          Math.min(4, Math.floor(progress.value + 0.5)),
+        );
+
+        if (stage === activeStage) return;
+
+        activeStage = stage;
+
+        if (headLines.length) {
+          gsap.to(headLines, {
+            yPercent: stage > 0 ? 100 : 0,
+            duration: 0.5,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+        }
+
+        if (textLines.length) {
+          gsap.to(textLines, {
+            yPercent: stage > 0 ? 0 : 100,
+            duration: 0.5,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+        }
+
+        stageAnimations.forEach((animateToStage) =>
+          animateToStage(stage - 1),
+        );
+      });
+
+      // =================================
+      // STAGE 2 — 20% to 40%
+      // VALUE 1 → VALUE 2
+      // =================================
+
+      // Handled by addSplitTextSequence
+
+      // =================================
+      // STAGE 3 — 40% to 60%
+      // VALUE 2 → VALUE 3
+      // =================================
+
+      // Handled by addSplitTextSequence
+
+      // =================================
+      // STAGE 4 — 60% to 80%
+      // VALUE 3 → VALUE 4
+      // =================================
+
+      // Handled by addSplitTextSequence
+
+      // =================================
+      // STAGE 5 — 80% to 100%
+      // HOLD
+      // =================================
+    }, rail);
+
+    // =================================
+    // CLEANUP
+    // =================================
+
+    cleanups.push(() => {
+      ctx.revert();
+
+      splitInstances.forEach((split) => {
+        split.revert();
+      });
+
+      sequenceCleanups.forEach((cleanup) => {
+        cleanup();
+      });
+    });
+  });
+
+  ScrollTrigger.refresh();
+
+  return () => {
+    cleanups.forEach((cleanup) => cleanup());
+    ScrollTrigger.refresh();
+  };
+}
+
+function initGlobalParallax(root) {
+  const wrappers = [
+    ...(root.matches?.('[data-parallax="wrapper"]') ? [root] : []),
+    ...root.querySelectorAll('[data-parallax="wrapper"]'),
+  ];
+  const animations = [];
+
+  wrappers.forEach((wrapper) => {
+    const targets = Array.from(
+      wrapper.querySelectorAll('[data-parallax="target"]'),
+    ).filter(
+      (target) => target.closest('[data-parallax="wrapper"]') === wrapper,
+    );
+
+    if (!targets.length) return;
+
+    const animation = gsap.fromTo(
+      targets,
+      { yPercent: -15 },
+      {
+        yPercent: 15,
+        ease: "none",
+        scrollTrigger: {
+          trigger: wrapper,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: true,
+        },
+      },
+    );
+
+    animations.push(animation);
+  });
+
+  return () => {
+    animations.forEach((animation) => {
+      animation.scrollTrigger?.kill();
+      animation.kill();
+    });
+  };
+}
+
+function initHowRail(root) {
+  const rails = [
+    ...(root.matches?.(".how-rail") ? [root] : []),
+    ...root.querySelectorAll(".how-rail"),
+  ];
+  const timelines = [];
+
+  rails.forEach((rail) => {
+    const head = rail.querySelector(".how-head");
+    const cardList = rail.querySelector(".how-card-list");
+
+    if (!head && !cardList) return;
+
+    const timeline = gsap.timeline({
+      scrollTrigger: {
+        trigger: rail,
+        start: "top top",
+        end: "bottom bottom",
+        scrub: true,
+      },
+    });
+
+    if (head) {
+      timeline.fromTo(
+        head,
+        { opacity: 1 },
+        { opacity: 0, duration: 0.4, ease: "none" },
+        0,
+      );
+    }
+
+    if (cardList) {
+      timeline.fromTo(
+        cardList,
+        { xPercent: 0 },
+        { xPercent: -100, duration: 1, ease: "none" },
+        0,
+      );
+    }
+
+    timelines.push(timeline);
+  });
+
+  return () => {
+    timelines.forEach((timeline) => {
+      timeline.scrollTrigger?.kill();
+      timeline.kill();
+    });
+  };
+}
+
+function initDiagonalScroll(root) {
+  const marquees = [
+    ...(root.matches?.(".diagonal-marquee") ? [root] : []),
+    ...root.querySelectorAll(".diagonal-marquee"),
+  ];
+  const contexts = [];
+  const objectRelocations = [];
+  const hoverCleanups = [];
+
+  marquees.forEach((marquee) => {
+    const context = gsap.context(() => {
+      const track = marquee.querySelector(".diagonal-marquee-track");
+
+      if (!track) return;
+
+      const panels = marquee.querySelectorAll(".diagonal-marquee-panel");
+      const secondPanel = panels[1];
+      const object = secondPanel?.matches("[data-object]")
+        ? secondPanel
+        : secondPanel?.querySelector("[data-object]");
+      const serviceSection = marquee.closest(".service_about-sb");
+      const objectWrapper =
+        object?.closest("[data-object-wrapper]") ||
+        serviceSection?.querySelector("[data-object-wrapper]");
+      let placeholder = null;
+
+      const serviceInner = objectWrapper?.querySelector(".service_sb-inner");
+      const serviceItems = serviceInner
+        ? Array.from(serviceInner.querySelectorAll(".service_sb-item"))
+        : [];
+      const serviceOverlay = serviceInner?.querySelector(
+        ".service_sb-inner-overlay",
+      );
+      const imageContainer = object?.querySelector(
+        ".diagonal-marquee-panel-imgs",
+      );
+      const serviceImages = imageContainer
+        ? Array.from(imageContainer.querySelectorAll("img"))
+        : [];
+      let isRelocated = false;
+      let stopServiceObjectTween = () => {};
+      let syncHoveredObject = () => {};
+
+      if (serviceInner && serviceItems.length && serviceOverlay) {
+        const hiddenClipPath = "inset(0% 0% 100% 0%)";
+        const visibleClipPath = "inset(0% 0% 0% 0%)";
+        let overlayBaseHeight = 1;
+        let itemMetrics = [];
+        let activeHoverIndex = 0;
+        let isServiceHovered = false;
+        let overlayTween = null;
+        let imagesTween = null;
+        let objectPositionTween = null;
+
+        const refreshItemMetrics = () => {
+          overlayBaseHeight = Math.max(
+            ...serviceItems.map((item) => item.offsetHeight),
+            1,
+          );
+          itemMetrics = serviceItems.map((item) => ({
+            y: item.offsetTop - serviceOverlay.offsetTop,
+            scaleY: item.offsetHeight / overlayBaseHeight,
+          }));
+
+          gsap.set(serviceOverlay, {
+            height: overlayBaseHeight,
+            transformOrigin: "top left",
+          });
+        };
+
+        refreshItemMetrics();
+        gsap.set(serviceImages, { clipPath: hiddenClipPath });
+        if (serviceImages[0]) {
+          gsap.set(serviceImages[0], { clipPath: visibleClipPath });
+        }
+        gsap.set(serviceOverlay, itemMetrics[0]);
+
+        const getObjectTransform = (center) => {
+          if (!object || !isRelocated || !center) return null;
+
+          const objectRect = object.getBoundingClientRect();
+          const objectHeight = object.offsetHeight || objectRect.height;
+          if (!objectHeight) return null;
+
+          const currentX = Number(gsap.getProperty(object, "x")) || 0;
+          const currentYPercent =
+            Number(gsap.getProperty(object, "yPercent")) || 0;
+          const baseCenterX =
+            (objectRect.left + objectRect.right) / 2 - currentX;
+          const baseCenterY =
+            (objectRect.top + objectRect.bottom) / 2 -
+            (objectHeight * currentYPercent) / 100;
+
+          return {
+            x: center.x - baseCenterX,
+            yPercent: ((center.y - baseCenterY) / objectHeight) * 100,
+          };
+        };
+
+        const setObjectPosition = (center, animate = false) => {
+          const transform = getObjectTransform(center);
+          if (!transform) return;
+
+          if (objectPositionTween) objectPositionTween.kill();
+
+          if (animate) {
+            objectPositionTween = gsap.to(object, {
+              ...transform,
+              duration: 0.5,
+              ease: "power3.out",
+              overwrite: "auto",
+            });
+          } else {
+            gsap.set(object, transform);
+          }
+        };
+
+        const animateImages = (index) => {
+          if (!serviceImages.length) return;
+
+          imagesTween?.kill();
+          imagesTween = gsap.to(serviceImages, {
+            clipPath: (imageIndex) =>
+              imageIndex === index ? visibleClipPath : hiddenClipPath,
+            duration: 0.45,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+        };
+
+        const activateItem = (index) => {
+          if (isServiceHovered && index === activeHoverIndex) return;
+
+          isServiceHovered = true;
+          activeHoverIndex = index;
+          const metric = itemMetrics[index];
+
+          overlayTween?.kill();
+          overlayTween = gsap.to(serviceOverlay, {
+            ...metric,
+            duration: 0.5,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+
+          animateImages(index);
+
+          const itemRect = serviceItems[index].getBoundingClientRect();
+          setObjectPosition(
+            {
+              x: (itemRect.left + itemRect.right) / 2,
+              y: (itemRect.top + itemRect.bottom) / 2,
+            },
+            true,
+          );
+        };
+
+        const onHoverOut = () => {
+          if (!isServiceHovered) return;
+
+          isServiceHovered = false;
+          objectPositionTween?.kill();
+
+          if (isRelocated) {
+            objectPositionTween = gsap.to(object, {
+              x: 0,
+              yPercent: 0,
+              duration: 0.35,
+              ease: "power2.out",
+              overwrite: "auto",
+            });
+          }
+        };
+
+        syncHoveredObject = () => {
+          if (!isServiceHovered) return;
+
+          const itemRect =
+            serviceItems[activeHoverIndex].getBoundingClientRect();
+          setObjectPosition({
+            x: (itemRect.left + itemRect.right) / 2,
+            y: (itemRect.top + itemRect.bottom) / 2,
+          });
+        };
+
+        stopServiceObjectTween = () => {
+          objectPositionTween?.kill();
+        };
+
+        const itemListeners = serviceItems.map((item, index) => {
+          const onActivate = () => activateItem(index);
+          item.addEventListener("pointerenter", onActivate);
+          item.addEventListener("focusin", onActivate);
+
+          return () => {
+            item.removeEventListener("pointerenter", onActivate);
+            item.removeEventListener("focusin", onActivate);
+          };
+        });
+
+        const onFocusOut = (event) => {
+          if (!serviceInner.contains(event.relatedTarget)) {
+            onHoverOut();
+          }
+        };
+
+        serviceInner.addEventListener("pointerleave", onHoverOut);
+        serviceInner.addEventListener("focusout", onFocusOut);
+
+        hoverCleanups.push(() => {
+          itemListeners.forEach((removeListener) => removeListener());
+          serviceInner.removeEventListener("pointerleave", onHoverOut);
+          serviceInner.removeEventListener("focusout", onFocusOut);
+          overlayTween?.kill();
+          imagesTween?.kill();
+          objectPositionTween?.kill();
+        });
+      }
+
+      const getCenteredXPercent = () => {
+        if (!object) return 19.67;
+
+        const measureElement = placeholder || object;
+        const currentXPercent = gsap.getProperty(track, "xPercent");
+
+        gsap.set(track, { xPercent: -20 });
+        const startRect = measureElement.getBoundingClientRect();
+        gsap.set(track, { xPercent: -19 });
+        const nextRect = measureElement.getBoundingClientRect();
+        gsap.set(track, { xPercent: currentXPercent });
+
+        const startCenter = (startRect.left + startRect.right) / 2;
+        const nextCenter = (nextRect.left + nextRect.right) / 2;
+        const centerShiftPerPercent = nextCenter - startCenter;
+
+        if (Math.abs(centerShiftPerPercent) < 0.001) return 19.67;
+
+        return (
+          -20 + (window.innerWidth / 2 - startCenter) / centerShiftPerPercent
+        );
+      };
+
+      gsap.set(marquee, { rotation: -9.33 });
+      gsap.set(panels, { rotation: 9.33 });
+
+      const animation = gsap.timeline({
+        scrollTrigger: {
+          trigger: marquee,
+          start: "top bottom",
+          end: "+=120% bottom",
+          scrub: true,
+          invalidateOnRefresh: true,
+        },
+      });
+
+      animation.fromTo(
+        track,
+        {
+          xPercent: -20,
+          // transformOrigin: "top left",
+        },
+        {
+          xPercent: getCenteredXPercent,
+          ease: "none",
+        },
+        0,
+      );
+
+      if (object && objectWrapper && serviceSection) {
+        const originalParent = object.parentElement;
+        const originalObjectStyle = object.getAttribute("style");
+        const originalSectionPosition =
+          serviceSection.style.getPropertyValue("position");
+        const originalSectionPositionPriority =
+          serviceSection.style.getPropertyPriority("position");
+        let objectSize = null;
+
+        const restoreObject = () => {
+          if (!isRelocated) return;
+          stopServiceObjectTween();
+
+          if (placeholder?.parentNode) {
+            placeholder.parentNode.insertBefore(object, placeholder);
+            placeholder.remove();
+          } else {
+            originalParent.appendChild(object);
+          }
+
+          if (originalObjectStyle === null) {
+            object.removeAttribute("style");
+          } else {
+            object.setAttribute("style", originalObjectStyle);
+          }
+
+          if (originalSectionPosition) {
+            serviceSection.style.setProperty(
+              "position",
+              originalSectionPosition,
+              originalSectionPositionPriority,
+            );
+          } else {
+            serviceSection.style.removeProperty("position");
+          }
+
+          isRelocated = false;
+        };
+
+        const moveObjectToSection = () => {
+          const objectRect = object.getBoundingClientRect();
+
+          if (!isRelocated) {
+            const computedObjectStyle = getComputedStyle(object);
+            objectSize = {
+              width: computedObjectStyle.width,
+              height: computedObjectStyle.height,
+              boxSizing: computedObjectStyle.boxSizing,
+            };
+            placeholder = object.cloneNode(false);
+            placeholder.removeAttribute("id");
+            placeholder.removeAttribute("data-object");
+            placeholder.setAttribute("aria-hidden", "true");
+            Object.assign(placeholder.style, {
+              width: objectSize.width,
+              height: objectSize.height,
+              boxSizing: objectSize.boxSizing,
+              display: computedObjectStyle.display,
+              position: computedObjectStyle.position,
+              flex: computedObjectStyle.flex,
+              flexBasis: computedObjectStyle.flexBasis,
+              gridArea: computedObjectStyle.gridArea,
+              alignSelf: computedObjectStyle.alignSelf,
+              justifySelf: computedObjectStyle.justifySelf,
+              order: computedObjectStyle.order,
+              margin: computedObjectStyle.margin,
+              minWidth: computedObjectStyle.minWidth,
+              minHeight: computedObjectStyle.minHeight,
+              maxWidth: computedObjectStyle.maxWidth,
+              maxHeight: computedObjectStyle.maxHeight,
+              visibility: "hidden",
+              pointerEvents: "none",
+            });
+
+            originalParent.insertBefore(placeholder, object);
+            serviceSection.appendChild(object);
+            isRelocated = true;
+          }
+
+          if (getComputedStyle(serviceSection).position === "static") {
+            gsap.set(serviceSection, { position: "relative" });
+          }
+
+          const sectionRect = serviceSection.getBoundingClientRect();
+          const currentY = gsap.getProperty(object, "y");
+          const objectTop =
+            objectRect.top -
+            sectionRect.top -
+            serviceSection.clientTop -
+            currentY;
+
+          gsap.set(object, {
+            position: "absolute",
+            top: `${objectTop}px`,
+            left: `${
+              window.innerWidth / 2 -
+              sectionRect.left -
+              serviceSection.clientLeft
+            }px`,
+            width: objectSize.width,
+            height: objectSize.height,
+            boxSizing: objectSize.boxSizing,
+            x: 0,
+            y: currentY,
+            xPercent: -50,
+            yPercent: 0,
+            rotation: 0,
+          });
+          syncHoveredObject();
+        };
+
+        const objectAnimation = gsap.to(object, {
+          y: () =>
+            Math.max(
+              0,
+              objectWrapper.getBoundingClientRect().bottom +
+                window.scrollY -
+                animation.scrollTrigger.end,
+            ),
+          ease: "none",
+          scrollTrigger: {
+            trigger: objectWrapper,
+            start: () => animation.scrollTrigger.end,
+            endTrigger: objectWrapper,
+            end: "bottom top",
+            scrub: true,
+            invalidateOnRefresh: true,
+            onEnter: moveObjectToSection,
+            onEnterBack: moveObjectToSection,
+            onLeaveBack: restoreObject,
+            onRefresh(self) {
+              if (self.isActive || self.progress > 0) {
+                moveObjectToSection();
+              }
+            },
+          },
+        });
+
+        if (
+          objectAnimation.scrollTrigger.isActive ||
+          objectAnimation.scrollTrigger.progress > 0
+        ) {
+          moveObjectToSection();
+        }
+        objectRelocations.push(restoreObject);
+      }
+    }, marquee);
+
+    contexts.push(context);
+  });
+
+  return () => {
+    hoverCleanups.reverse().forEach((cleanup) => cleanup());
+    contexts.reverse().forEach((context) => context.revert());
+    objectRelocations.reverse().forEach((restore) => restore());
+  };
+}
+
+function initTestimoniSwiper(root) {
+  const sliders = [
+    ...(root.matches?.(".swiper.is-testimoni") ? [root] : []),
+    ...root.querySelectorAll(".swiper.is-testimoni"),
+  ];
+
+  if (!sliders.length) return () => {};
+
+  if (typeof window.Swiper !== "function") {
+    console.error("Swiper is not available on the page.");
+    return () => {};
+  }
+
+  const cleanups = sliders.map((slider) => {
+    const controlsRoot = slider.parentElement || root;
+    const nextEl = controlsRoot.querySelector(".swiper-btn-next");
+    const prevEl = controlsRoot.querySelector(".swiper-btn-prev");
+    const currentEl = controlsRoot.querySelector("[data-testi-current]");
+    const totalEl = controlsRoot.querySelector("[data-testi-total]");
+    const targetEl =
+      controlsRoot.querySelector("[data-testi-target]") ||
+      root.querySelector("[data-testi-target]");
+    const slideTexts = Array.from(slider.querySelectorAll(".swiper-slide")).map(
+      (slide) =>
+        slide.querySelector("[data-testi-text]")?.textContent.trim() ?? "",
+    );
+
+    if (!nextEl || !prevEl) {
+      console.warn("Testimonial Swiper navigation buttons were not found.");
+    }
+
+    const swiper = new window.Swiper(slider, {
+      slidesPerView: "auto",
+      slidesPerGroup: 1,
+      spaceBetween: 24,
+      loop: false,
+      ...(nextEl && prevEl
+        ? {
+            navigation: {
+              nextEl,
+              prevEl,
+            },
+          }
+        : {}),
+    });
+
+    let activeText = null;
+    let textAnimation = null;
+    let textSplit = null;
+
+    const clearTextAnimation = () => {
+      textAnimation?.kill();
+      textAnimation = null;
+      textSplit?.revert();
+      textSplit = null;
+    };
+
+    const updateTestimoniText = (index, animate = true) => {
+      if (!targetEl) return;
+
+      const nextText = slideTexts[index] ?? "";
+      if (nextText === activeText) return;
+
+      activeText = nextText;
+      clearTextAnimation();
+
+      if (!animate || !targetEl.textContent.trim() || !nextText) {
+        targetEl.textContent = nextText;
+        return;
+      }
+
+      const outgoingSplit = SplitText.create(targetEl, {
+        type: "lines",
+        mask: "lines",
+      });
+      textSplit = outgoingSplit;
+
+      textAnimation = gsap.to(outgoingSplit.lines, {
+        yPercent: -100,
+        duration: 0.35,
+        ease: "power3.in",
+        onComplete() {
+          if (textSplit !== outgoingSplit) return;
+
+          outgoingSplit.revert();
+          textSplit = null;
+          targetEl.textContent = nextText;
+
+          const incomingSplit = SplitText.create(targetEl, {
+            type: "lines",
+            mask: "lines",
+          });
+          textSplit = incomingSplit;
+
+          gsap.set(incomingSplit.lines, {
+            yPercent: 100,
+          });
+
+          textAnimation = gsap.to(incomingSplit.lines, {
+            yPercent: 0,
+            duration: 0.45,
+            ease: "power3.out",
+            onComplete() {
+              if (textSplit !== incomingSplit) return;
+
+              incomingSplit.revert();
+              textSplit = null;
+              textAnimation = null;
+            },
+          });
+        },
+      });
+    };
+
+    const updateCounters = () => {
+      if (currentEl) {
+        currentEl.textContent = String(swiper.realIndex + 1).padStart(2, "0");
+      }
+
+      if (totalEl) {
+        totalEl.textContent = String(swiper.slides.length).padStart(2, "0");
+      }
+    };
+
+    const updateSlideContent = () => {
+      updateCounters();
+      updateTestimoniText(swiper.realIndex);
+    };
+
+    const updateTrailingOffset = () => {
+      if (swiper.destroyed || !swiper.slidesSizesGrid.length) return;
+
+      const lastSlideSize =
+        swiper.slidesSizesGrid[swiper.slidesSizesGrid.length - 1];
+      const trailingOffset = Math.max(swiper.size - lastSlideSize, 0);
+
+      if (
+        Math.abs((swiper.params.slidesOffsetAfter || 0) - trailingOffset) < 1
+      ) {
+        return;
+      }
+
+      swiper.params.slidesOffsetAfter = trailingOffset;
+      swiper.update();
+    };
+
+    swiper.on("slideChange", updateSlideContent);
+    updateCounters();
+    updateTestimoniText(swiper.realIndex, false);
+    updateTrailingOffset();
+
+    if (window.ResizeObserver) {
+      const resizeObserver = new window.ResizeObserver(updateTrailingOffset);
+      resizeObserver.observe(slider);
+
+      const lastSlide = swiper.slides[swiper.slides.length - 1];
+      if (lastSlide) resizeObserver.observe(lastSlide);
+
+      return () => {
+        resizeObserver.disconnect();
+        swiper.off("slideChange", updateSlideContent);
+        clearTextAnimation();
+        swiper.destroy(true, true);
+      };
+    }
+
+    window.addEventListener("resize", updateTrailingOffset);
+
+    return () => {
+      window.removeEventListener("resize", updateTrailingOffset);
+      swiper.off("slideChange", updateSlideContent);
+      clearTextAnimation();
+      swiper.destroy(true, true);
+    };
+  });
+
+  return () => {
+    cleanups.forEach((cleanup) => cleanup());
+  };
+}
+
+function initCurated(
+  root,
+  { includeFlipbookPages = false, item: itemOverride = null } = {},
+) {
+  const getCssDimension = (element, property, offsetProperty) => {
+    const dimension = Number.parseFloat(
+      window.getComputedStyle(element)[property],
+    );
+    return Number.isFinite(dimension) ? dimension : element[offsetProperty];
+  };
+  const wrappers = itemOverride
+    ? [root]
+    : [
+        ...(root.matches?.('[data-curated="wrapper"]') ? [root] : []),
+        ...root.querySelectorAll('[data-curated="wrapper"]'),
+      ];
+  const contexts = [];
+
+  wrappers.forEach((wrapper) => {
+    const item =
+      itemOverride ||
+      Array.from(wrapper.querySelectorAll('[data-curated="item"]')).find(
+        (element) => element.closest('[data-curated="wrapper"]') === wrapper,
+      );
+    const target = Array.from(
+      wrapper.querySelectorAll('[data-curated="target"]'),
+    ).find(
+      (element) => element.closest('[data-curated="wrapper"]') === wrapper,
+    );
+    const image = target?.querySelector('[data-curated="img"]');
+
+    if (!item || !target || !image) {
+      console.warn(
+        "Curated wrapper must contain an item, target, and target image.",
+        wrapper,
+      );
+      return;
+    }
+
+    if (!includeFlipbookPages && item.closest("[data-flipbook-page]")) {
+      return;
+    }
+
+    const itemRect = item.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+
+    if (
+      !itemRect.width ||
+      !itemRect.height ||
+      !imageRect.width ||
+      !imageRect.height
+    ) {
+      console.warn(
+        "Curated item and image must have measurable dimensions.",
+        wrapper,
+      );
+      return;
+    }
+
+    const sourceX = Number(gsap.getProperty(item, "x")) || 0;
+    const sourceY = Number(gsap.getProperty(item, "y")) || 0;
+    const sourceWidth = getCssDimension(item, "width", "offsetWidth");
+    const sourceHeight = getCssDimension(item, "height", "offsetHeight");
+    const getFitTransform = () => {
+      const currentItemRect = item.getBoundingClientRect();
+      const imageRect = image.getBoundingClientRect();
+      const currentX = Number(gsap.getProperty(item, "x")) || 0;
+      const currentY = Number(gsap.getProperty(item, "y")) || 0;
+      const currentWidth = getCssDimension(item, "width", "offsetWidth");
+      const currentHeight = getCssDimension(item, "height", "offsetHeight");
+      const widthScale = currentWidth
+        ? currentItemRect.width / currentWidth
+        : 1;
+      const heightScale = currentHeight
+        ? currentItemRect.height / currentHeight
+        : 1;
+      const targetWidth = imageRect.width / widthScale;
+      const targetHeight = imageRect.height / heightScale;
+      const parent = item.parentElement;
+      const parentRect = parent?.getBoundingClientRect();
+      const translationScaleX =
+        parent && parent.offsetWidth
+          ? parentRect.width / parent.offsetWidth || 1
+          : 1;
+      const translationScaleY =
+        parent && parent.offsetHeight
+          ? parentRect.height / parent.offsetHeight || 1
+          : 1;
+
+      const restoreStyleProperty = (property, value, priority) => {
+        if (value) item.style.setProperty(property, value, priority);
+        else item.style.removeProperty(property);
+      };
+      const originalWidth = item.style.getPropertyValue("width");
+      const originalWidthPriority = item.style.getPropertyPriority("width");
+      const originalHeight = item.style.getPropertyValue("height");
+      const originalHeightPriority = item.style.getPropertyPriority("height");
+      const originalTransition = item.style.getPropertyValue("transition");
+      const originalTransitionPriority =
+        item.style.getPropertyPriority("transition");
+      let fittedRect;
+
+      item.style.setProperty("transition", "none", "important");
+      try {
+        item.style.setProperty("width", `${targetWidth}px`, "important");
+        item.style.setProperty("height", `${targetHeight}px`, "important");
+        gsap.set(item, { x: sourceX, y: sourceY });
+        fittedRect = item.getBoundingClientRect();
+      } finally {
+        restoreStyleProperty("width", originalWidth, originalWidthPriority);
+        restoreStyleProperty("height", originalHeight, originalHeightPriority);
+        restoreStyleProperty(
+          "transition",
+          originalTransition,
+          originalTransitionPriority,
+        );
+        gsap.set(item, { x: currentX, y: currentY });
+      }
+
+      return {
+        x: sourceX + (imageRect.left - fittedRect.left) / translationScaleX,
+        y: sourceY + (imageRect.top - fittedRect.top) / translationScaleY,
+        width: targetWidth,
+        height: targetHeight,
+      };
+    };
+
+    const context = gsap.context(() => {
+      gsap.fromTo(
+        item,
+        {
+          x: sourceX,
+          y: sourceY,
+          width: sourceWidth,
+          height: sourceHeight,
+        },
+        {
+          x: () => getFitTransform().x,
+          y: () => getFitTransform().y,
+          width: () => getFitTransform().width,
+          height: () => getFitTransform().height,
+          ease: "none",
+          scrollTrigger: {
+            trigger: target,
+            start: "top bottom",
+            end: "bottom bottom",
+            scrub: true,
+            // Avoid measuring the destination while a flipbook page is rotating.
+            invalidateOnRefresh: !includeFlipbookPages,
+          },
+        },
+      );
+    }, wrapper);
+
+    contexts.push(context);
+  });
+
+  return () => {
+    contexts.reverse().forEach((context) => context.revert());
+  };
+}
+
+function initServiceAccordion(root) {
+  const lists = [
+    ...(root.matches?.(".services-list") ? [root] : []),
+    ...root.querySelectorAll(".services-list"),
+  ];
+  const contexts = [];
+  const listenerCleanups = [];
+  const imageTweenCleanups = [];
+  const splits = [];
+  let active = true;
+  let refreshFrame = 0;
+
+  const scheduleScrollTriggerRefresh = () => {
+    if (!active || refreshFrame) return;
+
+    refreshFrame = requestAnimationFrame(() => {
+      refreshFrame = 0;
+      if (!active) return;
+
+      ScrollTrigger?.getAll().forEach((scrollTrigger) => {
+        if (
+          scrollTrigger.trigger?.closest?.(
+            '[data-curated="wrapper"], .team-rail',
+          )
+        ) {
+          return;
+        }
+
+        scrollTrigger.refresh();
+      });
+    });
+  };
+
+  lists.forEach((list) => {
+    const items = Array.from(list.querySelectorAll(".service-item"));
+    const servicesWrapper =
+      list.closest(".services-wrapper") || list.parentElement;
+    const imagesWrapper = root.querySelector(".services-images");
+    const images = imagesWrapper
+      ? Array.from(imagesWrapper.querySelectorAll("img"))
+      : [];
+    const hiddenClipPath = "inset(0% 0% 100% 0%)";
+    const visibleClipPath = "inset(0% 0% 0% 0%)";
+    let activeItem = null;
+    let imageTween = null;
+
+    if (!imagesWrapper) {
+      console.warn("Service accordion images wrapper was not found.", list);
+    } else if (images.length !== items.length) {
+      console.warn(
+        "Service accordion item and image counts do not match.",
+        list,
+      );
+    }
+
+    const animateImage = (activeIndex) => {
+      if (!images.length) return;
+
+      imageTween?.kill();
+      imageTween = gsap.to(images, {
+        clipPath: (imageIndex) =>
+          imageIndex === activeIndex ? visibleClipPath : hiddenClipPath,
+        duration: 0.45,
+        ease: "power2.inOut",
+        overwrite: "auto",
+      });
+    };
+
+    const context = gsap.context(() => {
+      gsap.set(images, { clipPath: hiddenClipPath });
+      if (images[0]) gsap.set(images[0], { clipPath: visibleClipPath });
+
+      items.forEach((item, index) => {
+        const head = item.querySelector(".service-item-head");
+        const heading = head?.querySelector(".h1");
+        const number = head?.querySelector(".text-14");
+        const text = item.querySelector(".text-16");
+        const content = item.querySelector(".service-item-content");
+
+        if (!head || !content) {
+          console.warn(
+            "Service accordion item is missing its head or content.",
+            item,
+          );
+          return;
+        }
+
+        const entry = {
+          content,
+          isOpen: false,
+          lines: [],
+          split: null,
+          timeline: null,
+        };
+
+        if (heading) gsap.set(heading, { opacity: 0.2 });
+        if (number) gsap.set(number, { opacity: 0.5 });
+
+        // gsap.set(content, {
+        //   height: 0,
+        //   overflow: "hidden",
+        // });
+
+        if (text) {
+          entry.split = SplitText.create(text, {
+            type: "lines",
+            mask: "lines",
+            onSplit(self) {
+              entry.lines = self.lines;
+              gsap.set(entry.lines, {
+                yPercent: entry.isOpen ? 0 : -100,
+              });
+            },
+          });
+          splits.push(entry.split);
+        }
+
+        const timeline = gsap.timeline({
+          paused: true,
+          onComplete: scheduleScrollTriggerRefresh,
+          onReverseComplete: scheduleScrollTriggerRefresh,
+        });
+
+        if (heading) {
+          timeline.to(
+            heading,
+            { opacity: 1, duration: 0.3, ease: "power2.inOut" },
+            0,
+          );
+        }
+
+        if (number) {
+          timeline.to(
+            number,
+            { opacity: 1, duration: 0.3, ease: "power2.inOut" },
+            0,
+          );
+        }
+
+        timeline.to(
+          content,
+          {
+            height: "auto",
+            duration: 0.3,
+            ease: "power2.inOut",
+            onComplete: () => gsap.set(content, { clearProps: "overflow" }),
+          },
+          0,
+        );
+
+        if (entry.lines.length) {
+          timeline.to(
+            entry.lines,
+            {
+              yPercent: 0,
+              duration: 0.3,
+              ease: "power2.inOut",
+            },
+            0,
+          );
+        }
+
+        entry.timeline = timeline;
+
+        const onClick = () => {
+          if (activeItem === entry) return;
+
+          if (activeItem) {
+            activeItem.isOpen = false;
+            gsap.set(activeItem.content, { overflow: "hidden" });
+            activeItem.timeline.reverse();
+          }
+
+          activeItem = entry;
+          entry.isOpen = true;
+          gsap.set(content, { overflow: "hidden" });
+          timeline.play();
+          animateImage(index);
+        };
+
+        head.addEventListener("click", onClick);
+        listenerCleanups.push(() => head.removeEventListener("click", onClick));
+
+        if (item === items[0]) onClick();
+      });
+    }, list);
+
+    imageTweenCleanups.push(() => imageTween?.kill());
+    contexts.push(context);
+  });
+
+  return () => {
+    active = false;
+    cancelAnimationFrame(refreshFrame);
+    listenerCleanups.reverse().forEach((cleanup) => cleanup());
+    imageTweenCleanups.reverse().forEach((cleanup) => cleanup());
+    contexts.reverse().forEach((context) => context.revert());
+    splits.reverse().forEach((split) => split.revert());
+  };
+}
+
+function initTeamScroll(root) {
+  const rails = [
+    ...(root.matches?.(".team-rail") ? [root] : []),
+    ...root.querySelectorAll(".team-rail"),
+  ];
+  const contexts = [];
+  const splits = [];
+
+  rails.forEach((rail) => {
+    const blocks = Array.from(rail.querySelectorAll(".team-bg-block")).sort(
+      (first, second) =>
+        second.getBoundingClientRect().top - first.getBoundingClientRect().top,
+    );
+    const textElements = Array.from(
+      rail.querySelectorAll(".team-content-text"),
+    );
+    const lines = [];
+
+    textElements.forEach((element) => {
+      const split = SplitText.create(element, {
+        type: "lines",
+        mask: "lines",
+      });
+      splits.push(split);
+      lines.push(...split.lines);
+    });
+
+    lines.sort(
+      (first, second) =>
+        second.getBoundingClientRect().top - first.getBoundingClientRect().top,
+    );
+
+    if (!blocks.length && !lines.length) {
+      console.warn("Team rail has no background blocks or text.", rail);
+      return;
+    }
+
+    const context = gsap.context(() => {
+      if (blocks.length) {
+        gsap.set(blocks, {
+          scaleY: 0,
+          transformOrigin: "50% 100%",
+        });
+
+        gsap.to(blocks, {
+          scaleY: 1,
+          transformOrigin: "50% 100%",
+          ease: "none",
+          stagger: { each: 0.08, from: "start" },
+          scrollTrigger: {
+            trigger: rail,
+            start: "top bottom",
+            end: "+=5% top",
+            scrub: true,
+            invalidateOnRefresh: true,
+          },
+        });
+
+        gsap.fromTo(
+          blocks,
+          {
+            scaleY: 1,
+            transformOrigin: "50% 0%",
+          },
+          {
+            scaleY: 0,
+            transformOrigin: "50% 0%",
+            ease: "none",
+            stagger: { each: 0.08, from: "start" },
+            immediateRender: false,
+            scrollTrigger: {
+              trigger: rail,
+              start: "bottom bottom",
+              end: "bottom top",
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
+          },
+        );
+      }
+
+      if (lines.length) {
+        gsap.set(lines, { yPercent: 100 });
+
+        gsap.fromTo(
+          lines,
+          { yPercent: 100 },
+          {
+            yPercent: 0,
+            ease: "none",
+            stagger: { each: 0.5, from: "end" },
+            scrollTrigger: {
+              trigger: rail,
+              start: "top top",
+              end: () =>
+                `+=${Math.max(
+                  1,
+                  Math.min(
+                    window.innerHeight * 0.15,
+                    rail.offsetHeight - window.innerHeight,
+                  ),
+                )}`,
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
+          },
+        );
+
+        gsap.fromTo(
+          lines,
+          { yPercent: 0 },
+          {
+            yPercent: -100,
+            ease: "none",
+            stagger: { each: 0.5, from: "end" },
+            immediateRender: false,
+            scrollTrigger: {
+              trigger: rail,
+              start: "bottom bottom",
+              end: () =>
+                `+=${Math.max(
+                  1,
+                  Math.min(
+                    window.innerHeight * 0.15,
+                    rail.offsetHeight - window.innerHeight,
+                  ),
+                )}`,
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
+          },
+        );
+      }
+    }, rail);
+
+    contexts.push(context);
+  });
+
+  return () => {
+    contexts.reverse().forEach((context) => context.revert());
+    splits.reverse().forEach((split) => split.revert());
+  };
+}
+
+function initScrollAnimations(container) {
+  if (!container) return () => {};
+
+  const cleanups = [
+    initLineReveal(container),
+    initLineRevealOpacity(container),
+    initStaggerReveal(container),
+    initPeopleItemAnimation(container),
+    initWTAScale(container),
+    initWTARunning(container),
+    initDisciplinesRunning(container),
+    initDisciplineScroll(container),
+    initGlobalParallax(container),
+    initCurated(container),
+    initServiceAccordion(container),
+    initTeamScroll(container),
+    initHowRail(container),
+    initDiagonalScroll(container),
+  ];
+
+  let active = true;
+  const refreshScrollTriggers = () => {
+    if (active) ScrollTrigger?.refresh();
+  };
+  const pendingImages = Array.from(container.querySelectorAll("img")).filter(
+    (image) => !image.complete,
+  );
+  const refreshFrame = requestAnimationFrame(refreshScrollTriggers);
+
+  pendingImages.forEach((image) => {
+    image.addEventListener("load", refreshScrollTriggers);
+    image.addEventListener("error", refreshScrollTriggers);
+  });
+
+  document.fonts?.ready.then(refreshScrollTriggers);
+
+  return () => {
+    active = false;
+    cancelAnimationFrame(refreshFrame);
+
+    pendingImages.forEach((image) => {
+      image.removeEventListener("load", refreshScrollTriggers);
+      image.removeEventListener("error", refreshScrollTriggers);
+    });
+
+    cleanups.reverse().forEach((cleanup) => cleanup?.());
+  };
+}
+
+function initFilterScrollTriggerRefresh(root) {
+  const selector = '[fs-list-element="list"], [data-fs-list-element="list"]';
+  const lists = [
+    ...(root.matches?.(selector) ? [root] : []),
+    ...root.querySelectorAll(selector),
+  ];
+
+  if (!lists.length) return () => {};
+
+  if (!window.ResizeObserver) {
+    console.warn(
+      "ResizeObserver is not available; ScrollTrigger will not refresh after fs-list filtering.",
+    );
+    return () => {};
+  }
+
+  let active = true;
+  let refreshFrame = 0;
+  const observer = new window.ResizeObserver(() => {
+    if (refreshFrame) return;
+
+    refreshFrame = requestAnimationFrame(() => {
+      refreshFrame = 0;
+      if (active) ScrollTrigger?.refresh();
+    });
+  });
+
+  lists.forEach((list) => observer.observe(list));
+
+  return () => {
+    active = false;
+    cancelAnimationFrame(refreshFrame);
+    observer.disconnect();
+  };
+}
+
+/*
+Webflow HTML:
+<div data-marquee>
+  <div data-marquee-track>
+    <div data-marquee-panel>Panel A</div>
+    <div data-marquee-panel>Panel B</div>
+    <div data-marquee-panel>Panel C</div>
+    <div data-marquee-panel>Panel D</div>
+  </div>
+</div>
+*/
+function initMarquee(root) {
+  const marquees = [
+    ...(root.matches?.("[data-marquee]") ? [root] : []),
+    ...root.querySelectorAll("[data-marquee]"),
+  ];
+
+  if (!marquees.length) return () => {};
+
+  if (!window.gsap) {
+    console.error("GSAP is not available for the marquee.");
+    return () => {};
+  }
+
+  const gsapApi = window.gsap;
+  const gap = 1.5;
+  const cleanups = marquees.map((marquee) => {
+    const track = marquee.querySelector("[data-marquee-track]");
+    const panels = track ? Array.from(track.children) : [];
+
+    if (!track || !panels.length) {
+      console.warn("Marquee requires a track with at least one panel.");
+      return () => {};
+    }
+
+    const originalMarqueeStyle = marquee.getAttribute("style");
+    const originalTrackStyle = track.getAttribute("style");
+    const clones = [];
+
+    marquee.style.overflow = "hidden";
+    Object.assign(track.style, {
+      alignItems: "flex-end",
+      columnGap: `${gap}em`,
+      display: "flex",
+      flexWrap: "nowrap",
+      width: "max-content",
+      willChange: "transform",
+    });
+
+    let active = true;
+    let cycleWidth = 0;
+    let offset = 0;
+    let direction = 1;
+    let previousScrollY = window.scrollY;
+    let currentSpeed = 50;
+    let targetSpeed = 50;
+    let lastScrollTime = performance.now();
+    let lastScrollActivity = lastScrollTime;
+    const baseSpeed = 50;
+    const scrollSpeedFactor = 0.2;
+    const maxScrollBoost = 400;
+    const setX = gsapApi.quickSetter(track, "x", "px");
+
+    const removeClones = () => {
+      clones.splice(0).forEach((clone) => {
+        clone.remove();
+      });
+    };
+
+    const clonePanel = (panel) => {
+      const clone = panel.cloneNode(true);
+      clone.dataset.marqueeClone = "";
+      clone.setAttribute("aria-hidden", "true");
+      clone.setAttribute("inert", "");
+      clone.style.pointerEvents = "none";
+      if (clone.id) clone.removeAttribute("id");
+      clone.querySelectorAll("[id]").forEach((element) => {
+        element.removeAttribute("id");
+      });
+      return clone;
+    };
+
+    const rebuildTrack = () => {
+      removeClones();
+      panels.forEach((panel) => {
+        const clone = clonePanel(panel);
+        clones.push(clone);
+        track.append(clone);
+      });
+
+      const nextCycleWidth =
+        clones[0].getBoundingClientRect().left -
+        panels[0].getBoundingClientRect().left;
+
+      if (!nextCycleWidth) {
+        console.warn("Marquee panels have no measurable width.");
+        removeClones();
+        cycleWidth = 0;
+        return false;
+      }
+
+      cycleWidth = nextCycleWidth;
+      const viewportWidth = marquee.clientWidth || window.innerWidth;
+      const setCount = Math.max(
+        2,
+        Math.ceil((viewportWidth + cycleWidth) / cycleWidth),
+      );
+
+      for (let setIndex = 1; setIndex < setCount; setIndex += 1) {
+        panels.forEach((panel) => {
+          const clone = clonePanel(panel);
+          clones.push(clone);
+          track.append(clone);
+        });
+      }
+
+      offset = ((offset % cycleWidth) + cycleWidth) % cycleWidth;
+      setX(-offset);
+      return true;
+    };
+
+    const restoreStyles = () => {
+      if (originalMarqueeStyle === null) marquee.removeAttribute("style");
+      else marquee.setAttribute("style", originalMarqueeStyle);
+
+      if (originalTrackStyle === null) track.removeAttribute("style");
+      else track.setAttribute("style", originalTrackStyle);
+    };
+
+    if (!rebuildTrack()) {
+      restoreStyles();
+      return () => {};
+    }
+
+    const handleScroll = () => {
+      const now = performance.now();
+      const nextScrollY = window.scrollY;
+      const delta = nextScrollY - previousScrollY;
+      const elapsed = Math.max((now - lastScrollTime) / 1000, 0.016);
+
+      if (Math.abs(delta) > 0.5) {
+        direction = delta > 0 ? 1 : -1;
+        const scrollVelocity = Math.abs(delta) / elapsed;
+        targetSpeed =
+          baseSpeed +
+          Math.min(scrollVelocity * scrollSpeedFactor, maxScrollBoost);
+        lastScrollActivity = now;
+      }
+
+      previousScrollY = nextScrollY;
+      lastScrollTime = now;
+    };
+
+    const tick = (_time, deltaTime) => {
+      if (!active || !cycleWidth) return;
+
+      const elapsed = Math.min(deltaTime || 16.67, 50) / 1000;
+      if (performance.now() - lastScrollActivity > 80) {
+        targetSpeed = baseSpeed;
+      }
+      const smoothing = 1 - Math.exp(-elapsed / 0.25);
+      currentSpeed += (targetSpeed - currentSpeed) * smoothing;
+      offset = (offset + direction * currentSpeed * elapsed) % cycleWidth;
+      if (offset < 0) offset += cycleWidth;
+
+      setX(-offset);
+    };
+
+    const handleResize = () => {
+      rebuildTrack();
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+    gsapApi.ticker.add(tick);
+
+    return () => {
+      active = false;
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+      gsapApi.ticker.remove(tick);
+      removeClones();
+      restoreStyles();
+    };
+  });
+
+  return () => {
+    cleanups.reverse().forEach((cleanup) => cleanup());
+  };
+}
+
 /* =========================================
    WORK HOVER + SCRAMBLE TEXT
 ========================================= */
+
+function footerGalleryHover(root) {
+  const cards = [
+    ...(root.matches?.(".footer-top-card") ? [root] : []),
+    ...root.querySelectorAll(".footer-top-card"),
+  ];
+  const images = Array.from(root.querySelectorAll(".footer-top-img"));
+  const logos = cards.map((card) => card.querySelector(".footer-top-logo"));
+  const originalCardOpacities = cards.map(
+    (card) => getComputedStyle(card).opacity,
+  );
+  const originalLogoOpacities = logos.map((logo) =>
+    logo ? getComputedStyle(logo).opacity : null,
+  );
+  const contentItems = Array.from(
+    root.querySelectorAll(".footer-top-content-item"),
+  );
+
+  if (!cards.length) return () => {};
+
+  gsap.set(images, { opacity: 0 });
+  gsap.set(contentItems, { yPercent: 0 });
+
+  const activateCard = (index) => {
+    cards.forEach((currentCard, cardIndex) => {
+      const isActive = cardIndex === index;
+
+      gsap.to(currentCard, {
+        opacity: isActive ? 1 : originalCardOpacities[cardIndex],
+        duration: 0.35,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+
+      const logo = logos[cardIndex];
+      if (logo) {
+        gsap.to(logo, {
+          opacity: isActive ? 1 : originalLogoOpacities[cardIndex],
+          duration: 0.35,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      }
+    });
+
+    gsap.to(images, {
+      opacity: (imageIndex) => (imageIndex === index ? 1 : 0),
+      duration: 0.35,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+
+    if (contentItems.length) {
+      gsap.to(contentItems, {
+        yPercent: index * -100,
+        duration: 0.45,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+    }
+  };
+
+  const cleanups = cards.map((card, index) => {
+    const handleEnter = () => activateCard(index);
+
+    card.addEventListener("mouseenter", handleEnter);
+
+    return () => {
+      card.removeEventListener("mouseenter", handleEnter);
+    };
+  });
+
+  activateCard(0);
+
+  return () => {
+    cleanups.forEach((cleanup) => cleanup());
+    gsap.killTweensOf([
+      ...cards,
+      ...logos.filter(Boolean),
+      ...images,
+      ...contentItems,
+    ]);
+  };
+}
 
 function initWorkHover(root = document) {
   const wrappers = root.querySelectorAll('[data-work="wrapper"]');
@@ -1121,9 +3274,7 @@ function initWorkHover(root = document) {
     const textElements = new Map();
     const textTweens = new Map();
 
-    // =====================================
     // SCRAMBLE CHARACTERS
-    // =====================================
 
     const upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const lowerChars = "abcdefghijklmnopqrstuvwxyz";
@@ -1141,9 +3292,7 @@ function initWorkHover(root = document) {
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
-    // =====================================
     // INIT TEXT
-    // =====================================
 
     items.forEach((item) => {
       const texts = item.querySelectorAll('[data-work="text"]');
@@ -1153,9 +3302,7 @@ function initWorkHover(root = document) {
       });
     });
 
-    // =====================================
     // SCRAMBLE TEXT ANIMATION
-    // =====================================
 
     function scrambleText(element) {
       const original = textElements.get(element);
@@ -1183,9 +3330,7 @@ function initWorkHover(root = document) {
       const scrambleState = { value: 0 };
       const resolveState = { progress: 0 };
 
-      // =====================================
       // RANDOM SCRAMBLE
-      // =====================================
 
       function renderScramble() {
         element.textContent = chars
@@ -1195,9 +3340,7 @@ function initWorkHover(root = document) {
           .join("");
       }
 
-      // =====================================
       // RESOLVE TO ORIGINAL TEXT
-      // =====================================
 
       function renderResolve() {
         const revealed = Math.floor(resolveState.progress * totalChars);
@@ -1213,9 +3356,7 @@ function initWorkHover(root = document) {
           .join("");
       }
 
-      // =====================================
       // TIMELINE
-      // =====================================
 
       const timeline = gsap.timeline({
         onComplete: () => {
@@ -1243,9 +3384,7 @@ function initWorkHover(root = document) {
       textTweens.set(element, timeline);
     }
 
-    // =====================================
     // HOVER ITEM
-    // =====================================
 
     function handleEnter(activeItem) {
       items.forEach((item) => {
@@ -1267,9 +3406,7 @@ function initWorkHover(root = document) {
       texts.forEach(scrambleText);
     }
 
-    // =====================================
     // RESET
-    // =====================================
 
     function handleLeave() {
       gsap.to(items, {
@@ -1282,9 +3419,7 @@ function initWorkHover(root = document) {
       });
     }
 
-    // =====================================
     // EVENTS
-    // =====================================
 
     items.forEach((item) => {
       const onEnter = () => handleEnter(item);
@@ -1312,12 +3447,648 @@ function initWorkHover(root = document) {
     });
   });
 
-  // =====================================
   // CLEANUP
-  // =====================================
 
   return () => {
     cleanups.forEach((cleanup) => cleanup());
+  };
+}
+
+
+function initWorkCategoryHover(root = document) {
+  const wrappers = [
+    ...(root.matches?.(".p_work-inner") ? [root] : []),
+    ...root.querySelectorAll(".p_work-inner"),
+  ];
+
+  const cleanups = [];
+
+  wrappers.forEach((wrapper) => {
+    const items = Array.from(
+      wrapper.querySelectorAll(
+        ".work-item-by-category[data-p-work]"
+      )
+    );
+
+    const imgWrap = wrapper.querySelector(".p_work-img");
+
+    const imageItems = Array.from(
+      wrapper.querySelectorAll(
+        ".p_work-img-item[data-p-work]"
+      )
+    );
+
+    if (!items.length) return;
+
+    // ==========================
+    // STATE
+    // ==========================
+
+    let activeItem = null;
+    let stackOrder = 0;
+    let resetVersion = 0;
+
+    const imageStack = new Set();
+    const imageAnimations = new Map();
+
+    let resetAnimation = null;
+
+    // ==========================
+    // CLIP PATH CONFIG
+    // ==========================
+
+    const CENTER_CLIP =
+      "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
+
+    const FULL_CLIP =
+      "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+
+    // ==========================
+    // ANIMATION CONTROLLER
+    // ==========================
+
+    const stopImageAnimations = () => {
+      imageAnimations.forEach((animation) => {
+        animation.kill();
+      });
+
+      imageAnimations.clear();
+
+      if (resetAnimation) {
+        resetAnimation.kill();
+        resetAnimation = null;
+      }
+
+      gsap.killTweensOf(imageItems, "clipPath");
+    };
+
+    const trackImageAnimation = (image, animation) => {
+      imageAnimations.set(image, animation);
+
+      animation.eventCallback("onComplete", () => {
+        if (imageAnimations.get(image) === animation) {
+          imageAnimations.delete(image);
+        }
+      });
+    };
+
+    // ==========================
+    // GSAP CONTEXT
+    // ==========================
+
+    let moveWrapY;
+
+    const ctx = gsap.context(() => {
+      gsap.set(items, {
+        opacity: 1,
+      });
+
+      gsap.set(imageItems, {
+        clipPath: CENTER_CLIP,
+        zIndex: 0,
+        willChange: "clip-path",
+      });
+
+      if (imgWrap) {
+        moveWrapY = gsap.quickTo(imgWrap, "y", {
+          duration: 0.6,
+          ease: "power3.out",
+        });
+      }
+    }, wrapper);
+
+    // ==========================
+    // MOVE IMAGE WRAPPER
+    // ==========================
+
+    const moveWrapTo = (targetY) => {
+      if (!imgWrap || !moveWrapY) return;
+
+      const rect = imgWrap.getBoundingClientRect();
+
+      const currentY =
+        Number(gsap.getProperty(imgWrap, "y")) || 0;
+
+      const baseCenterY =
+        rect.top + rect.height / 2 - currentY;
+
+      moveWrapY(targetY - baseCenterY);
+    };
+
+    // ==========================
+    // ACTIVATE ITEM
+    // ==========================
+
+    ctx.add("activateItem", (target) => {
+      activeItem = target;
+
+      // Cancel previous reset callbacks
+      resetVersion++;
+
+      // ==========================
+      // MATCH IMAGE
+      // ==========================
+
+      const workName = target.getAttribute("data-p-work");
+
+      const currentImage = imageItems.find(
+        (image) =>
+          image.getAttribute("data-p-work") === workName
+      );
+
+      // ==========================
+      // ITEM OPACITY
+      // ==========================
+
+      items.forEach((item) => {
+        gsap.to(item, {
+          opacity: item === target ? 1 : 0.2,
+          duration: 0.4,
+          ease: "power3.out",
+          overwrite: "auto",
+        });
+      });
+
+      // ==========================
+      // MOVE WRAPPER
+      // ==========================
+
+      const itemRect = target.getBoundingClientRect();
+
+      moveWrapTo(
+        itemRect.top + itemRect.height / 2
+      );
+
+      if (!currentImage) return;
+
+      // ==========================
+      // STOP PREVIOUS ANIMATIONS
+      // ==========================
+
+      stopImageAnimations();
+
+      // ==========================
+      // UPDATE IMAGE STACK
+      // ==========================
+
+      // Move current image to the top
+      imageStack.delete(currentImage);
+      imageStack.add(currentImage);
+
+      // Recalculate z-index
+      stackOrder = 0;
+
+      imageStack.forEach((image) => {
+        stackOrder++;
+
+        gsap.set(image, {
+          zIndex: stackOrder,
+        });
+      });
+
+      // ==========================
+      // SET CURRENT IMAGE CLOSED
+      // ==========================
+
+      // IMPORTANT:
+      // Always reset directly to CENTER_CLIP.
+      // No closing animation.
+      // This applies to both new and previously
+      // revealed images.
+
+      gsap.set(currentImage, {
+        clipPath: CENTER_CLIP,
+      });
+
+      // ==========================
+      // SETTLE PREVIOUS IMAGES
+      // ==========================
+
+      imageStack.forEach((image) => {
+        if (image === currentImage) return;
+
+        const settleTween = gsap.to(image, {
+          clipPath: FULL_CLIP,
+          duration: 0.32,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+
+        trackImageAnimation(image, settleTween);
+      });
+
+      // ==========================
+      // REVEAL CURRENT IMAGE
+      // ==========================
+
+      const revealTween = gsap.to(currentImage, {
+        clipPath: FULL_CLIP,
+        duration: 0.65,
+        ease: "power3.out",
+        overwrite: "auto",
+
+        onComplete: () => {
+          if (imageAnimations.get(currentImage) === revealTween) {
+            imageAnimations.delete(currentImage);
+          }
+        },
+      });
+
+      trackImageAnimation(currentImage, revealTween);
+    });
+
+    // ==========================
+    // RESET ITEMS
+    // ==========================
+
+    ctx.add("resetItems", () => {
+      activeItem = null;
+
+      const currentReset = ++resetVersion;
+
+      // Stop all running image animations
+      stopImageAnimations();
+
+      // Reset opacity
+      gsap.to(items, {
+        opacity: 1,
+        duration: 0.4,
+        ease: "power3.out",
+        overwrite: "auto",
+      });
+
+      // Reset wrapper position
+      if (moveWrapY) {
+        moveWrapY(0);
+      }
+
+      const stackedImages = Array.from(imageStack);
+
+      if (!stackedImages.length) return;
+
+      // Close all images
+      resetAnimation = gsap.to(stackedImages, {
+        clipPath: CENTER_CLIP,
+        duration: 0.45,
+        ease: "power2.inOut",
+        overwrite: "auto",
+
+        onComplete: () => {
+          if (
+            currentReset !== resetVersion ||
+            activeItem !== null
+          ) return;
+
+          gsap.set(imageItems, {
+            zIndex: 0,
+          });
+
+          imageStack.clear();
+
+          stackOrder = 0;
+          resetAnimation = null;
+        },
+      });
+    });
+
+    // ==========================
+    // POINTER MOVEMENT
+    // ==========================
+
+    const onPointerEnter = (event) => {
+      moveWrapTo(event.clientY);
+    };
+
+    const onPointerMove = (event) => {
+      const hoveredItem =
+        event.target instanceof Element
+          ? event.target.closest(
+              ".work-item-by-category[data-p-work]"
+            )
+          : null;
+
+      if (
+        hoveredItem &&
+        wrapper.contains(hoveredItem)
+      ) {
+        const rect = hoveredItem.getBoundingClientRect();
+
+        moveWrapTo(
+          rect.top + rect.height / 2
+        );
+      } else {
+        moveWrapTo(event.clientY);
+      }
+    };
+
+    const onPointerLeave = () => {
+      ctx.resetItems();
+    };
+
+    wrapper.addEventListener(
+      "pointerenter",
+      onPointerEnter
+    );
+
+    wrapper.addEventListener(
+      "pointermove",
+      onPointerMove
+    );
+
+    wrapper.addEventListener(
+      "pointerleave",
+      onPointerLeave
+    );
+
+    // ==========================
+    // ITEM EVENTS
+    // ==========================
+
+    const listeners = [];
+
+    items.forEach((item) => {
+      const onEnter = () => {
+        ctx.activateItem(item);
+      };
+
+      item.addEventListener(
+        "pointerenter",
+        onEnter
+      );
+
+      listeners.push(() => {
+        item.removeEventListener(
+          "pointerenter",
+          onEnter
+        );
+      });
+    });
+
+    // ==========================
+    // CLEANUP
+    // ==========================
+
+    cleanups.push(() => {
+      wrapper.removeEventListener(
+        "pointerenter",
+        onPointerEnter
+      );
+
+      wrapper.removeEventListener(
+        "pointermove",
+        onPointerMove
+      );
+
+      wrapper.removeEventListener(
+        "pointerleave",
+        onPointerLeave
+      );
+
+      listeners.reverse().forEach((remove) => {
+        remove();
+      });
+
+      stopImageAnimations();
+
+      imageStack.clear();
+
+      ctx.revert();
+    });
+  });
+
+  // ==========================
+  // DESTROY
+  // ==========================
+
+  return () => {
+    cleanups.reverse().forEach((cleanup) => {
+      cleanup();
+    });
+  };
+}
+
+/* =========================================
+   GLOBAL NAVBAR
+========================================= */
+
+function initNavbar() {
+  const navWrapper = document.querySelector(".nav-wrapper");
+  const getNavLinks = () =>
+    Array.from(document.querySelectorAll("[data-nav-link]"));
+  const navToggle = document.querySelector("[data-nav-toggle]");
+  const targets = [
+    ...new Set([navWrapper, ...getNavLinks(), navToggle].filter(Boolean)),
+  ];
+
+  if (!window.gsap) {
+    console.error("GSAP is not available for the navbar.");
+    return () => {};
+  }
+
+  const gsapApi = window.gsap;
+  const originalStyles = new Map(
+    targets.map((element) => [element, element.getAttribute("style")]),
+  );
+  const trackElements = (elements) => {
+    elements.forEach((element) => {
+      if (!originalStyles.has(element)) {
+        originalStyles.set(element, element.getAttribute("style"));
+      }
+    });
+  };
+  const originalPaddingTop = navWrapper
+    ? getComputedStyle(navWrapper).paddingTop
+    : null;
+  const originalPaddingBottom = navWrapper
+    ? getComputedStyle(navWrapper).paddingBottom
+    : null;
+  const originalNavOpacity = navWrapper
+    ? getComputedStyle(navWrapper).opacity
+    : null;
+  const originalNavPointerEvents = navWrapper
+    ? getComputedStyle(navWrapper).pointerEvents
+    : null;
+  let isCompact = window.scrollY >= 200;
+  let isMenuOpen = false;
+  let noNavbarTriggers = [];
+  const activeNoNavbarTriggers = new Set();
+
+  if (navToggle) gsapApi.set(navToggle, { yPercent: 100 });
+
+  const render = (animate = true) => {
+    const currentNavLinks = getNavLinks();
+    trackElements(currentNavLinks);
+
+    const linksYPercent = isCompact && !isMenuOpen ? 100 : 0;
+    const toggleYPercent = isCompact && !isMenuOpen ? 0 : 100;
+    const animation = {
+      duration: 0.45,
+      ease: "power2.inOut",
+      overwrite: "auto",
+    };
+
+    if (animate) {
+      gsapApi.to(currentNavLinks, {
+        ...animation,
+        yPercent: linksYPercent,
+        stagger: linksYPercent < 0 ? 0.03 : 0,
+      });
+      if (navToggle) {
+        gsapApi.to(navToggle, {
+          ...animation,
+          yPercent: toggleYPercent,
+        });
+      }
+    } else {
+      gsapApi.set(currentNavLinks, { yPercent: linksYPercent });
+      if (navToggle) gsapApi.set(navToggle, { yPercent: toggleYPercent });
+    }
+
+    if (navWrapper && isCompact) {
+      if (animate) {
+        gsapApi.to(navWrapper, {
+          ...animation,
+          paddingTop: "1em",
+          paddingBottom: "1em",
+        });
+      } else {
+        gsapApi.set(navWrapper, {
+          paddingTop: "1em",
+          paddingBottom: "1em",
+        });
+      }
+    } else if (navWrapper && animate) {
+      gsapApi.to(navWrapper, {
+        ...animation,
+        paddingTop: originalPaddingTop,
+        paddingBottom: originalPaddingBottom,
+      });
+    }
+  };
+
+  const updateNoNavbarState = () => {
+    if (!navWrapper) return;
+
+    const isHidden = activeNoNavbarTriggers.size > 0;
+
+    gsapApi.set(navWrapper, {
+      pointerEvents: isHidden ? "none" : originalNavPointerEvents,
+    });
+    gsapApi.to(navWrapper, {
+      opacity: isHidden ? 0 : originalNavOpacity,
+      duration: 0.3,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  };
+
+  const refreshNoNavbarTriggers = () => {
+    noNavbarTriggers.forEach((trigger) => trigger.kill());
+    noNavbarTriggers = [];
+    activeNoNavbarTriggers.clear();
+
+    const sections = document.querySelectorAll("[data-no-navbar]");
+
+    if (!window.ScrollTrigger?.create) {
+      if (sections.length) {
+        console.error("ScrollTrigger is not available for navbar sections.");
+      }
+      updateNoNavbarState();
+      return;
+    }
+
+    sections.forEach((section) => {
+      const trigger = window.ScrollTrigger.create({
+        trigger: section,
+        start: "top top",
+        end: "bottom top",
+        onToggle(self) {
+          if (self.isActive) activeNoNavbarTriggers.add(self);
+          else activeNoNavbarTriggers.delete(self);
+
+          updateNoNavbarState();
+        },
+      });
+
+      noNavbarTriggers.push(trigger);
+      if (trigger.isActive) activeNoNavbarTriggers.add(trigger);
+    });
+
+    updateNoNavbarState();
+  };
+
+  render(false);
+  refreshNoNavbarTriggers();
+
+  const navLinksObserver = new MutationObserver((mutations) => {
+    const hasNavLinkChanges = mutations.some((mutation) => {
+      if (mutation.type === "attributes") {
+        return mutation.attributeName === "data-nav-link";
+      }
+
+      return Array.from(mutation.addedNodes).some(
+        (node) =>
+          node.nodeType === Node.ELEMENT_NODE &&
+          (node.matches("[data-nav-link]") ||
+            node.querySelector("[data-nav-link]")),
+      );
+    });
+
+    const hasNoNavbarChanges = mutations.some((mutation) => {
+      if (mutation.type === "attributes") {
+        return mutation.attributeName === "data-no-navbar";
+      }
+
+      return [...mutation.addedNodes, ...mutation.removedNodes].some(
+        (node) =>
+          node.nodeType === Node.ELEMENT_NODE &&
+          (node.matches("[data-no-navbar]") ||
+            node.querySelector("[data-no-navbar]")),
+      );
+    });
+
+    if (hasNavLinkChanges) render(false);
+    if (hasNoNavbarChanges) refreshNoNavbarTriggers();
+  });
+  navLinksObserver.observe(document.documentElement, {
+    attributeFilter: ["data-nav-link", "data-no-navbar"],
+    attributes: true,
+    childList: true,
+    subtree: true,
+  });
+
+  const handleScroll = () => {
+    const nextCompact = window.scrollY >= 200;
+    const shouldCloseMenu = isMenuOpen;
+
+    if (!shouldCloseMenu && nextCompact === isCompact) return;
+
+    isCompact = nextCompact;
+    isMenuOpen = false;
+    render();
+  };
+
+  const handleToggleClick = (event) => {
+    if (!isCompact) return;
+    event.preventDefault();
+    isMenuOpen = !isMenuOpen;
+    render();
+  };
+
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  navToggle?.addEventListener("click", handleToggleClick);
+
+  return () => {
+    window.removeEventListener("scroll", handleScroll);
+    navToggle?.removeEventListener("click", handleToggleClick);
+    navLinksObserver.disconnect();
+    noNavbarTriggers.forEach((trigger) => trigger.kill());
+    activeNoNavbarTriggers.clear();
+    originalStyles.forEach((style, element) => {
+      gsapApi.killTweensOf(element);
+      if (style === null) element.removeAttribute("style");
+      else element.setAttribute("style", style);
+    });
   };
 }
 
@@ -1333,11 +4104,16 @@ function initCustomCursor() {
 
   if (!cursor) return () => {};
 
+  const defaultBackgroundColor = getComputedStyle(cursor).backgroundColor;
+  const originalInlineBackgroundColor = cursor.style.backgroundColor;
+  const originalInlineOpacity = cursor.style.opacity;
   let activeLink = null;
   let cursorSize = 12;
 
   let pointerX = 0;
   let pointerY = 0;
+  let hasPointerPosition = false;
+  let cursorMode = "default";
 
   let moveX;
   let moveY;
@@ -1346,9 +4122,7 @@ function initCustomCursor() {
 
   let isActive = false;
 
-  // =====================================
   // INITIALIZE
-  // =====================================
 
   function setupCursor() {
     if (!media.matches || isActive) return;
@@ -1395,14 +4169,12 @@ function initCustomCursor() {
       handlePointerLeave,
     );
 
-    window.addEventListener("scroll", updateActiveLink, true);
+    window.addEventListener("scroll", updateActiveLinkAtPointer, true);
     window.addEventListener("resize", handleResize);
     window.addEventListener("blur", handlePointerLeave);
   }
 
-  // =====================================
   // MOVE CURSOR
-  // =====================================
 
   function moveCursor(x, y, width, height) {
     moveX(x);
@@ -1411,9 +4183,38 @@ function initCustomCursor() {
     moveHeight(height);
   }
 
-  // =====================================
+  function animateBackgroundColor(color) {
+    gsap.to(cursor, {
+      backgroundColor: color,
+      duration: 0.3,
+      ease: "power3.out",
+      overwrite: "auto",
+    });
+  }
+
+  function animateCursorMode(mode) {
+    if (cursorMode === mode) return;
+
+    cursorMode = mode;
+    gsap.to(cursor, {
+      scale: mode === "no-link" ? 0 : 1,
+      opacity: mode === "default" ? 1 : 0,
+      duration: 0.3,
+      ease: "power3.out",
+      overwrite: "auto",
+    });
+  }
+
+  function getLinkTarget(element) {
+    if (!(element instanceof Element)) return null;
+
+    return (
+      element.closest("[data-no-link]") ||
+      element.closest('[data-link], [data-link-nest="wrapper"]')
+    );
+  }
+
   // UPDATE LINK BOUNDS
-  // =====================================
 
   function updateActiveLink() {
     if (!activeLink) return;
@@ -1421,10 +4222,14 @@ function initCustomCursor() {
     if (!activeLink.isConnected) {
       activeLink = null;
       cursor.classList.remove("is-active");
+      animateBackgroundColor(defaultBackgroundColor);
       return;
     }
 
-    const rect = activeLink.getBoundingClientRect();
+    const boundsTarget = activeLink.matches('[data-link-nest="wrapper"]')
+      ? activeLink.querySelector('[data-link-nest="target"]') || activeLink
+      : activeLink;
+    const rect = boundsTarget.getBoundingClientRect();
 
     const styles = getComputedStyle(cursor);
 
@@ -1440,46 +4245,46 @@ function initCustomCursor() {
     );
   }
 
-  // =====================================
-  // POINTER MOVE
-  // =====================================
-
-  function handlePointerMove(event) {
-    if (event.pointerType === "touch") return;
-
-    pointerX = event.clientX;
-    pointerY = event.clientY;
-
-    cursor.classList.add("is-visible");
-
-    // Global link detection
-    const target =
-      event.target instanceof Element
-        ? event.target.closest("[data-link]")
-        : null;
-
-    // =====================================
-    // ACTIVE LINK
-    // =====================================
-
+  function setActiveLink(target) {
     if (target) {
-      if (activeLink !== target) {
+      const isNoLink = target.hasAttribute("data-no-link");
+      const nextCursorMode = isNoLink ? "no-link" : "default";
+
+      if (activeLink !== target || cursorMode !== nextCursorMode) {
         activeLink = target;
         cursor.classList.add("is-active");
+
+        if (isNoLink) {
+          animateBackgroundColor(defaultBackgroundColor);
+        } else {
+          const isBlackLink =
+            target.getAttribute("data-link")?.trim().toLowerCase() === "black";
+          animateBackgroundColor(
+            isBlackLink ? "#ffffff" : defaultBackgroundColor,
+          );
+        }
+      }
+
+      animateCursorMode(nextCursorMode);
+      if (isNoLink) {
+        moveCursor(
+          pointerX - cursorSize / 2,
+          pointerY - cursorSize / 2,
+          cursorSize,
+          cursorSize,
+        );
+        return;
       }
 
       updateActiveLink();
-
       return;
     }
 
-    // =====================================
-    // DEFAULT STATE
-    // =====================================
+    if (activeLink) animateBackgroundColor(defaultBackgroundColor);
 
     activeLink = null;
-
     cursor.classList.remove("is-active");
+    animateCursorMode("default");
 
     moveCursor(
       pointerX - cursorSize / 2,
@@ -1489,39 +4294,49 @@ function initCustomCursor() {
     );
   }
 
-  // =====================================
+  function updateActiveLinkAtPointer() {
+    if (!hasPointerPosition) return;
+
+    const element = document.elementFromPoint(pointerX, pointerY);
+    setActiveLink(getLinkTarget(element));
+  }
+
+  // POINTER MOVE
+
+  function handlePointerMove(event) {
+    if (event.pointerType === "touch") return;
+
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+    hasPointerPosition = true;
+
+    cursor.classList.add("is-visible");
+
+    setActiveLink(getLinkTarget(event.target));
+  }
+
   // POINTER LEAVE
-  // =====================================
 
   function handlePointerLeave() {
+    if (activeLink) animateBackgroundColor(defaultBackgroundColor);
+
+    hasPointerPosition = false;
     activeLink = null;
+    animateCursorMode("outside");
 
     cursor.classList.remove("is-active");
     cursor.classList.remove("is-visible");
   }
 
-  // =====================================
   // RESIZE
-  // =====================================
 
   function handleResize() {
     cursorSize = parseFloat(getComputedStyle(cursor).width) || cursorSize;
 
-    if (activeLink) {
-      updateActiveLink();
-    } else {
-      moveCursor(
-        pointerX - cursorSize / 2,
-        pointerY - cursorSize / 2,
-        cursorSize,
-        cursorSize,
-      );
-    }
+    updateActiveLinkAtPointer();
   }
 
-  // =====================================
   // DESTROY
-  // =====================================
 
   function destroyCursor() {
     if (!isActive) return;
@@ -1535,7 +4350,7 @@ function initCustomCursor() {
       handlePointerLeave,
     );
 
-    window.removeEventListener("scroll", updateActiveLink, true);
+    window.removeEventListener("scroll", updateActiveLinkAtPointer, true);
     window.removeEventListener("resize", handleResize);
     window.removeEventListener("blur", handlePointerLeave);
 
@@ -1543,16 +4358,19 @@ function initCustomCursor() {
 
     cursor.classList.remove("is-visible", "is-active");
 
+    cursor.style.backgroundColor = originalInlineBackgroundColor;
+    cursor.style.opacity = originalInlineOpacity;
+
     gsap.set(cursor, {
       clearProps: "transform,width,height",
     });
 
     activeLink = null;
+    hasPointerPosition = false;
+    cursorMode = "outside";
   }
 
-  // =====================================
   // BREAKPOINT
-  // =====================================
 
   function handleBreakpoint() {
     if (media.matches) {
@@ -1566,9 +4384,7 @@ function initCustomCursor() {
 
   handleBreakpoint();
 
-  // =====================================
   // CLEANUP
-  // =====================================
 
   return () => {
     media.removeEventListener("change", handleBreakpoint);
@@ -1576,38 +4392,404 @@ function initCustomCursor() {
   };
 }
 
+/*
+GSAP and ScrollTrigger must be loaded before index.js.
+
+Webflow HTML:
+<section data-flipbook>
+  <div data-flipbook-sticky>
+    <div data-flipbook-book>
+      <div data-flipbook-page>Page 1</div>
+      <div data-flipbook-page>Page 2</div>
+      <div data-flipbook-page>Page 3</div>
+      <div data-flipbook-page>Page 4</div>
+    </div>
+  </div>
+</section>
+
+CSS:
+[data-flipbook] {
+  min-height: 400vh;
+  position: relative;
+}
+[data-flipbook-sticky] {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  height: 100vh;
+  padding-block: 1.5em;
+  position: sticky;
+  top: 0;
+}
+[data-flipbook-book] {
+  grid-column: 1 / -1;
+  height: 100%;
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+[data-flipbook-page] {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+*/
+function initFlipbook(root) {
+  const books = [
+    ...(root.matches?.("[data-flipbook]") ? [root] : []),
+    ...root.querySelectorAll("[data-flipbook]"),
+  ];
+
+  if (!books.length) return () => {};
+
+  if (!window.gsap) {
+    console.error("GSAP is not available for the flipbook.");
+    return () => {};
+  }
+
+  if (!window.ScrollTrigger) {
+    console.error("ScrollTrigger is not available for the flipbook.");
+    return () => {};
+  }
+
+  const gsapApi = window.gsap;
+  const cleanups = books.map((book) => {
+    const bookElement = book.querySelector("[data-flipbook-book]");
+    const stickyStage = book.querySelector("[data-flipbook-sticky]");
+    const pages = bookElement
+      ? Array.from(bookElement.querySelectorAll("[data-flipbook-page]"))
+      : [];
+
+    if (!bookElement || !stickyStage || pages.length < 2) {
+      console.warn("Flipbook stage, book element, or pages were not found.");
+      return () => {};
+    }
+
+    const hasCuratedItem = (page) =>
+      page.matches('[data-curated="item"]') ||
+      Boolean(page.querySelector('[data-curated="item"]'));
+
+    const curatedPageItems = pages.flatMap((page) => {
+      const items = [
+        ...(page.matches('[data-curated="item"]') ? [page] : []),
+        ...page.querySelectorAll('[data-curated="item"]'),
+      ];
+
+      return items.flatMap((item) => {
+        const wrapper = item.closest('[data-curated="wrapper"]');
+        return wrapper ? [{ item, page, wrapper }] : [];
+      });
+    });
+
+    const bounds = bookElement.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) {
+      console.warn("Flipbook has no measurable dimensions.");
+      return () => {};
+    }
+
+    const originalPosition = bookElement.style.position;
+    const originalPageStyles = pages.map((page) => page.getAttribute("style"));
+    if (window.getComputedStyle(bookElement).position === "static") {
+      bookElement.style.position = "relative";
+    }
+
+    const placeholders = pages.map((page) => {
+      const placeholder = document.createComment("flipbook-page");
+      page.parentNode.insertBefore(placeholder, page);
+      page.remove();
+      return placeholder;
+    });
+
+    const stage = document.createElement("div");
+    stage.dataset.flipbookStage = "";
+    Object.assign(stage.style, {
+      columnGap: "1em",
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+      gridTemplateRows: "minmax(0, 1fr)",
+      inset: "0",
+      perspective: "1600px",
+      position: "absolute",
+      transformStyle: "preserve-3d",
+      zIndex: "0",
+    });
+
+    const createSide = (side, column) => {
+      const element = document.createElement("div");
+      element.dataset.flipbookSide = side;
+      Object.assign(element.style, {
+        gridColumn: String(column),
+        minHeight: "0",
+        minWidth: "0",
+        overflow: "hidden",
+        position: "relative",
+        zIndex: "1",
+      });
+      return element;
+    };
+
+    const leftSide = createSide("left", 1);
+    const rightSide = createSide("right", 2);
+    stage.append(leftSide, rightSide);
+    bookElement.append(stage);
+
+    let active = true;
+    let activeSheet = null;
+    let currentIndex = 0;
+    let isPortrait = bounds.width < 560;
+    let scrollProgress = 0;
+    let scrollTrigger = null;
+    let resizeObserver = null;
+    let destroyCurated = () => {};
+
+    const pagesPerTurn = () => (isPortrait ? 1 : 2);
+    const turnCount = () => Math.floor((pages.length - 1) / pagesPerTurn());
+
+    const configureLayout = () => {
+      stage.style.gridTemplateColumns = isPortrait
+        ? "minmax(0, 1fr)"
+        : "minmax(0, 1fr) minmax(0, 1fr)";
+      stage.style.columnGap = isPortrait ? "0" : "1em";
+      leftSide.style.display = isPortrait ? "none" : "block";
+      rightSide.style.gridColumn = isPortrait ? "1" : "2";
+    };
+
+    const mountPage = (side, page) => {
+      side.replaceChildren();
+      side.style.setProperty("overflow", "hidden");
+      if (!page) return;
+
+      if (hasCuratedItem(page)) {
+        side.style.setProperty("overflow", "visible", "important");
+      }
+      page.style.width = "100%";
+      page.style.height = "100%";
+      side.append(page);
+    };
+
+    const renderView = (index) => {
+      destroyCurated();
+      destroyCurated = () => {};
+
+      leftSide.replaceChildren();
+      rightSide.replaceChildren();
+
+      if (isPortrait) {
+        mountPage(rightSide, pages[index]);
+      } else {
+        mountPage(leftSide, pages[index]);
+        mountPage(rightSide, pages[index + 1]);
+      }
+
+      const curatedCleanups = curatedPageItems
+        .filter(({ page }) => page.isConnected)
+        .map(({ item, wrapper }) =>
+          initCurated(wrapper, {
+            includeFlipbookPages: true,
+            item,
+          }),
+        );
+      destroyCurated = () => {
+        curatedCleanups.reverse().forEach((cleanup) => cleanup());
+      };
+    };
+
+    const clonePageFace = (page) => {
+      const clone = page.cloneNode(true);
+      clone.setAttribute("aria-hidden", "true");
+      clone.style.pointerEvents = "none";
+      if (clone.id) clone.removeAttribute("id");
+      clone.querySelectorAll("[id]").forEach((element) => {
+        element.removeAttribute("id");
+      });
+      return clone;
+    };
+
+    const createSheet = (frontPage, backPage, direction) => {
+      const sheet = document.createElement("div");
+      sheet.dataset.flipbookSheet = "";
+      Object.assign(sheet.style, {
+        height: "100%",
+        position: "absolute",
+        top: "0",
+        transformStyle: "preserve-3d",
+        width: isPortrait ? "100%" : "50%",
+        zIndex: "10",
+      });
+
+      if (isPortrait) {
+        sheet.style.left = "0";
+        sheet.style.transformOrigin = "50% 50%";
+      } else if (direction > 0) {
+        sheet.style.left = "50%";
+        sheet.style.transformOrigin = "left center";
+      } else {
+        sheet.style.left = "0";
+        sheet.style.transformOrigin = "right center";
+      }
+
+      const createFace = (page, backFace, insetSide) => {
+        const face = document.createElement("div");
+        const allowOverflow = !backFace && hasCuratedItem(page);
+        Object.assign(face.style, {
+          backfaceVisibility: "hidden",
+          inset: "0",
+          overflow: allowOverflow ? "visible" : "hidden",
+          pointerEvents: "none",
+          position: "absolute",
+        });
+
+        const pageFrame = document.createElement("div");
+        Object.assign(pageFrame.style, {
+          bottom: "0",
+          left: insetSide === "left" && !isPortrait ? "0.5em" : "0",
+          overflow: allowOverflow ? "visible" : "hidden",
+          position: "absolute",
+          right: insetSide === "right" && !isPortrait ? "0.5em" : "0",
+          top: "0",
+        });
+        if (allowOverflow) {
+          face.style.setProperty("overflow", "visible", "important");
+          pageFrame.style.setProperty("overflow", "visible", "important");
+        }
+        if (backFace) face.style.transform = "rotateY(180deg)";
+        pageFrame.append(page);
+        face.append(pageFrame);
+        return face;
+      };
+
+      const frontInset = isPortrait || direction > 0 ? "left" : "right";
+      const backInset = isPortrait || direction > 0 ? "right" : "left";
+      const frontFace = createFace(frontPage, false, frontInset);
+      const backFace = createFace(clonePageFace(backPage), true, backInset);
+      sheet.append(frontFace, backFace);
+      stage.append(sheet);
+
+      return sheet;
+    };
+
+    const syncToScroll = () => {
+      const maxTurns = turnCount();
+      if (!active || !maxTurns) return;
+
+      const progress = gsapApi.utils.clamp(
+        0,
+        maxTurns,
+        scrollProgress * maxTurns,
+      );
+      const isComplete = progress >= maxTurns;
+      const turnIndex = Math.min(Math.floor(progress), maxTurns - 1);
+      const turnProgress = isComplete ? 0 : progress - turnIndex;
+      const nextIndex = isComplete
+        ? maxTurns * pagesPerTurn()
+        : turnIndex * pagesPerTurn();
+
+      if (currentIndex !== nextIndex || (turnProgress === 0 && activeSheet)) {
+        activeSheet?.remove();
+        activeSheet = null;
+        currentIndex = nextIndex;
+        renderView(currentIndex);
+      }
+
+      if (isComplete || turnProgress === 0) return;
+
+      const nextPageIndex = currentIndex + pagesPerTurn();
+      const frontPage = pages[isPortrait ? currentIndex : currentIndex + 1];
+      const backPage = pages[nextPageIndex];
+
+      if (!frontPage || !backPage) return;
+
+      if (!activeSheet) {
+        activeSheet = createSheet(frontPage, backPage, 1);
+
+        if (isPortrait) {
+          mountPage(rightSide, pages[nextPageIndex]);
+        } else {
+          mountPage(rightSide, pages[nextPageIndex + 1]);
+        }
+      }
+
+      gsapApi.set(activeSheet, {
+        rotationY: -180 * turnProgress,
+      });
+    };
+
+    const handleResize = () => {
+      const nextPortrait = bookElement.clientWidth < 560;
+      if (nextPortrait === isPortrait) return;
+
+      activeSheet?.remove();
+      activeSheet = null;
+      isPortrait = nextPortrait;
+      currentIndex = 0;
+      configureLayout();
+      renderView(currentIndex);
+      window.ScrollTrigger.refresh();
+      syncToScroll();
+    };
+
+    configureLayout();
+    renderView(currentIndex);
+    window.addEventListener("resize", handleResize);
+    if (window.ResizeObserver) {
+      resizeObserver = new window.ResizeObserver(handleResize);
+      resizeObserver.observe(bookElement);
+    }
+
+    scrollTrigger = window.ScrollTrigger.create({
+      trigger: book,
+      start: "top top",
+      end: "90% bottom",
+      onRefresh(self) {
+        scrollProgress = self.progress;
+        syncToScroll();
+      },
+      onUpdate(self) {
+        scrollProgress = self.progress;
+        syncToScroll();
+      },
+    });
+
+    return () => {
+      active = false;
+      destroyCurated();
+      scrollTrigger?.kill();
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", handleResize);
+      activeSheet?.remove();
+      stage.remove();
+      placeholders.forEach((placeholder, index) => {
+        if (placeholder.parentNode) placeholder.replaceWith(pages[index]);
+        else bookElement.append(pages[index]);
+      });
+      pages.forEach((page, index) => {
+        const originalStyle = originalPageStyles[index];
+        if (originalStyle === null) page.removeAttribute("style");
+        else page.setAttribute("style", originalStyle);
+      });
+      bookElement.style.position = originalPosition;
+    };
+  });
+
+  return () => {
+    cleanups.reverse().forEach((cleanup) => cleanup());
+  };
+}
+
 /* =========================================
-   4. INIT PAGE
+   2. INIT PAGE
 ========================================= */
 
-function initPage(container, { initial = false } = {}) {
+function initPage(container) {
   if (!container) return () => {};
 
   const cleanups = [];
 
-  // =====================================
   // GSAP CONTEXT
-  // =====================================
 
   const ctx = gsap.context(() => {
-    // =====================================
-    // PRELOADER
-    // Initial page load only
-    // =====================================
-
-    if (initial) {
-      generatePixels(container);
-
-      const preloadCleanup = animatePreload(container);
-
-      if (preloadCleanup) {
-        cleanups.push(preloadCleanup);
-      }
-    }
-
-    // =====================================
     // PAGE ANIMATIONS
-    // =====================================
 
     const heroToggle = initHeroLayoutToggle({
       root: container,
@@ -1617,9 +4799,12 @@ function initPage(container, { initial = false } = {}) {
       heroToggle.destroy();
     });
 
-    // =====================================
+    cleanups.push(initTestimoniSwiper(container));
+    cleanups.push(initFilterScrollTriggerRefresh(container));
+    cleanups.push(initMarquee(container));
+    cleanups.push(footerGalleryHover(container));
+
     // WORK HOVER
-    // =====================================
 
     const workHoverCleanup = initWorkHover(container);
 
@@ -1627,14 +4812,16 @@ function initPage(container, { initial = false } = {}) {
       cleanups.push(workHoverCleanup);
     }
 
-    // ---------------------------------
+    const workCategoryHoverCleanup = initWorkCategoryHover(container);
+
+    if (workCategoryHoverCleanup) {
+      cleanups.push(workCategoryHoverCleanup);
+    }
+
     // ADD MORE ANIMATIONS HERE
-    // ---------------------------------
   }, container);
 
-  // =====================================
   // DESTROY PAGE
-  // =====================================
 
   return () => {
     cleanups.reverse().forEach((cleanup) => {
@@ -1646,30 +4833,7 @@ function initPage(container, { initial = false } = {}) {
 }
 
 /* =========================================
-   SCROLL ANIMATIONS
-========================================= */
-
-function initScrollAnimations(container) {
-  if (!container) return () => {};
-
-  const cleanups = [];
-
-  // LINE REVEAL
-  cleanups.push(initLineReveal(container));
-
-  // STAGGER REVEAL
-  cleanups.push(initStaggerReveal(container));
-
-  // CLEANUP
-  return () => {
-    cleanups.reverse().forEach((cleanup) => {
-      cleanup?.();
-    });
-  };
-}
-
-/* =========================================
-   5. WEBFLOW DOCUMENT UPDATE
+   3. WEBFLOW DOCUMENT UPDATE
 ========================================= */
 
 function updateWebflowDocument(data) {
@@ -1689,7 +4853,7 @@ function updateWebflowDocument(data) {
 }
 
 /* =========================================
-   6. WEBFLOW REINITIALIZATION
+   4. WEBFLOW REINITIALIZATION
 ========================================= */
 
 function destroyWebflow() {
@@ -1716,10 +4880,13 @@ function reinitWebflow() {
 }
 
 /* =========================================
-   7. BARBA INITIALIZATION
+   5. BARBA INITIALIZATION
 ========================================= */
 
 function initBarba() {
+  window.scrollTo(0, 0);
+  initNavbar();
+
   const wrapper = document.querySelector('[data-barba="wrapper"]');
 
   const initialContainer = document.querySelector('[data-barba="container"]');
@@ -1727,44 +4894,38 @@ function initBarba() {
   if (!wrapper || !initialContainer) return;
 
   const lenis = initSmoothScroll();
+  lenis?.scrollTo(0, {
+    immediate: true,
+    force: true,
+  });
 
   // Initialize custom scrollbar
   const fixedScrollbar = initFixedScrollbar(lenis);
 
-  // =====================================
   // INITIAL SETUP
-  // =====================================
 
-  generatePixels(wrapper);
-
-  const preloadTimeline = animatePreload(wrapper);
+  animatePreload(wrapper);
 
   const pageTransition = createPageTransition(wrapper);
 
-  // =====================================
   // INIT INITIAL PAGE
-  // =====================================
 
   let destroyCurrentPage = initPage(initialContainer);
+  let destroyCurrentScrollAnimations = initScrollAnimations(initialContainer);
+  let destroyCurrentFlipbook = initFlipbook(initialContainer);
 
-  let destroyScrollAnimations = initScrollAnimations(initialContainer);
-
-  // =====================================
   // BARBA INIT
-  // =====================================
 
   barba.init({
     preventRunning: true,
 
     transitions: [
       {
-        name: "pixel-transition",
+        name: "page-transition",
 
         sync: true,
 
-        // =================================
         // BEFORE ENTER
-        // =================================
 
         beforeEnter({ current, next }) {
           const wrapperRect = wrapper.getBoundingClientRect();
@@ -1789,18 +4950,14 @@ function initBarba() {
           });
         },
 
-        // =================================
         // LEAVE
-        // =================================
 
         leave() {
           // Keep current container visible.
           // Do not animate or hide it here.
         },
 
-        // =================================
         // ENTER
-        // =================================
 
         enter(data) {
           const { current, next } = data;
@@ -1808,32 +4965,27 @@ function initBarba() {
           const currentPage = current.container;
           const nextPage = next.container;
 
-          const nextPageName =
-            nextPage.dataset.pageName || next.namespace || "Page";
-
           // Stop scrolling during transition
           lenis?.stop();
 
           const tl = gsap.timeline();
 
-          // =====================================
           // 01. COVER CURRENT PAGE
-          // =====================================
 
-          tl.add(pageTransition.cover(currentPage, nextPageName));
+          tl.add(pageTransition.cover(currentPage), ">");
 
-          // =====================================
           // 02. DESTROY & INITIALIZE PAGE
-          // =====================================
 
           tl.call(
             () => {
               // Destroy old page
               destroyCurrentPage();
-              destroyScrollAnimations();
+              destroyCurrentScrollAnimations();
+              destroyCurrentFlipbook();
 
               destroyCurrentPage = () => {};
-              destroyScrollAnimations = () => {};
+              destroyCurrentScrollAnimations = () => {};
+              destroyCurrentFlipbook = () => {};
 
               // Update Webflow
               destroyWebflow();
@@ -1855,7 +5007,7 @@ function initBarba() {
               }
 
               // Initialize all animations
-              // while container is still transparent
+              // while the container is still transparent
               destroyCurrentPage = initPage(next.container);
 
               // Show page AFTER all initial states
@@ -1868,9 +5020,7 @@ function initBarba() {
             ">",
           );
 
-          // =====================================
           // 03. REVEAL NEXT PAGE
-          // =====================================
 
           tl.add(pageTransition.reveal(nextPage), ">");
 
@@ -1883,12 +5033,18 @@ function initBarba() {
             ">",
           );
 
+          tl.call(
+            () => {
+              lenis?.start();
+            },
+            null,
+            ">",
+          );
+
           return tl;
         },
 
-        // =================================
         // AFTER ENTER
-        // =================================
 
         afterEnter({ next }) {
           // Restore normal document flow
@@ -1897,14 +5053,14 @@ function initBarba() {
               "position,top,left,width,zIndex,opacity,visibility,pointerEvents",
           });
 
+          destroyCurrentScrollAnimations = initScrollAnimations(next.container);
+          destroyCurrentFlipbook = initFlipbook(next.container);
+
           // Update Lenis dimensions
           lenis?.resize();
 
           // Update scrollbar dimensions
           fixedScrollbar?.update();
-
-          // Initialize scroll animations
-          destroyScrollAnimations = initScrollAnimations(next.container);
 
           // Refresh ScrollTrigger
           ScrollTrigger?.refresh();
@@ -1924,10 +5080,10 @@ function initBarba() {
   });
 }
 
-const cleanupCustomCursor = initCustomCursor();
+initCustomCursor();
 
 /* =========================================
-   8. DOM READY
+   6. DOM READY
 ========================================= */
 
 if (document.readyState === "loading") {
