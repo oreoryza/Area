@@ -320,6 +320,7 @@ function animatePreload(root) {
   const vLine = wrap.querySelector(".preload-line-v");
   const hLinesWrap = wrap.querySelector(".preload-lines-horizontal");
   const hLine = wrap.querySelector(".preload-line-h");
+  const content = root.querySelector("[data-preload-content]");
 
   const logoLetters = logo
     ? Array.from(logo.querySelectorAll(":scope > div"))
@@ -375,6 +376,10 @@ function animatePreload(root) {
 
   gsap.set(logo, {
     opacity: 1,
+  });
+
+  gsap.set(content, {
+    opacity: 0,
   });
 
   // Initial letter position
@@ -575,6 +580,16 @@ function animatePreload(root) {
     wrap,
     {
       clipPath: "inset(0% 0% 100% 0%)",
+      duration: EXIT_DURATION,
+      ease: "power2.inOut",
+    },
+    "phase3",
+  );
+
+  tl.to(
+    content,
+    {
+      opacity: 1,
       duration: EXIT_DURATION,
       ease: "power2.inOut",
     },
