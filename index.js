@@ -3287,6 +3287,501 @@ function initServiceAccordion(root) {
   };
 }
 
+
+function initServicesTrail(root = document) {
+  const heroes = [
+    ...(root.matches?.(".hero-services") ? [root] : []),
+    ...root.querySelectorAll(".hero-services"),
+  ];
+
+  const cleanups = [];
+
+  // Configuration
+  const MAX_IMAGES = 6;
+  const AUTO_INTERVAL = 0.45;
+  const MOVE_THRESHOLD = 55;
+  const MOVE_COOLDOWN = 120;
+
+  // Clip path states
+  const CLIP_CLOSED =
+    "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
+
+  const CLIP_OPEN =
+    "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+
+  heroes.forEach((hero) => {
+    const trailRoot = hero.querySelector(".hero-services-trail");
+
+    if (!trailRoot) return;
+
+    // Get CMS images
+    const sourceImages = gsap.utils.toArray(
+      trailRoot.querySelectorAll(
+        ".services-trail-list .services-trail-item img"
+      )
+    );
+
+    if (!sourceImages.length) return;
+
+    // Ensure CMS images are loaded
+    sourceImages.forEach((image) => {
+      image.loading = "eager";
+    });
+
+    // Create dynamic stage
+    const stage = document.createElement("div");
+    stage.className = "services-trail-stage";
+
+    trailRoot.appendChild(stage);
+
+    // State
+    let activeItems = [];
+    let sourceIndex = 0;
+
+    let isInside = false;
+
+    let autoLoop = null;
+    let exitTween = null;
+
+    let lastPointer = null;
+    let lastMoveSpawnPoint = null;
+    let lastMoveSpawnAt = 0;
+
+    const pointer = {
+      x: 0,
+      y: 0,
+      dirX: 0,
+      dirY: 0,
+      angle: 0,
+    };
+
+    // ------------------------------------------------
+    // UPDATE POINTER POSITION AND DIRECTION
+    // ------------------------------------------------
+
+    function updatePointer(e) {
+      const rect = stage.getBoundingClientRect();
+
+      const point = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+
+      let distance = 0;
+
+      if (lastPointer) {
+        const dx = point.x - lastPointer.x;
+        const dy = point.y - lastPointer.y;
+
+        distance = Math.hypot(dx, dy);
+
+        if (distance > 0.5) {
+          pointer.dirX = dx / distance;
+          pointer.dirY = dy / distance;
+
+          let angle =
+            Math.atan2(dy, dx) * (180 / Math.PI);
+
+          // Normalize image orientation
+          if (angle > 90) angle -= 180;
+          if (angle < -90) angle += 180;
+
+          pointer.angle = angle;
+        }
+      }
+
+      pointer.x = point.x;
+      pointer.y = point.y;
+
+      lastPointer = point;
+
+      return {
+        point,
+        distance,
+      };
+    }
+
+    // ------------------------------------------------
+    // UPDATE STACK ORDER
+    // Oldest image = bottom
+    // Newest image = top
+    // ------------------------------------------------
+
+    function updateStackOrder() {
+      activeItems.forEach((item, index) => {
+        item.style.zIndex = index + 1;
+      });
+    }
+
+    // ------------------------------------------------
+    // CREATE IMAGE ELEMENT
+    // ------------------------------------------------
+
+    function createTrailItem() {
+      const source =
+        sourceImages[sourceIndex % sourceImages.length];
+
+      sourceIndex++;
+
+      const item = document.createElement("div");
+      item.className = "services-trail-image";
+
+      const image = source.cloneNode(true);
+
+      image.removeAttribute("id");
+      image.setAttribute("alt", "");
+      image.setAttribute("aria-hidden", "true");
+
+      image.loading = "eager";
+      image.draggable = false;
+
+      const imageSrc =
+        source.currentSrc ||
+        source.getAttribute("src") ||
+        source.getAttribute("data-src");
+
+      if (imageSrc) {
+        image.src = imageSrc;
+      }
+
+      item.appendChild(image);
+      stage.appendChild(item);
+
+      const stackIndex = activeItems.length;
+
+      // Perpendicular direction for stack spreading
+      const hasDirection =
+        Math.hypot(pointer.dirX, pointer.dirY) > 0.1;
+
+      const perpX = hasDirection ? -pointer.dirY : 0.7;
+      const perpY = hasDirection ? pointer.dirX : 0.7;
+
+      const spread = stackIndex * 5;
+
+      // Position slightly behind cursor
+      const x =
+        pointer.x - pointer.dirX * 20 + perpX * spread;
+
+      const y =
+        pointer.y - pointer.dirY * 20 + perpY * spread;
+
+      // Rotation follows cursor direction
+      const directionRotation = gsap.utils.clamp(
+        -12,
+        12,
+        pointer.angle * 0.12
+      );
+
+      const stackRotation =
+        (stackIndex - 2.5) * 1.2;
+
+      gsap.set(item, {
+        x,
+        y,
+        xPercent: -50,
+        yPercent: -50,
+
+        rotation: directionRotation + stackRotation,
+
+        scale: 0.92,
+        opacity: 1,
+
+        clipPath: CLIP_CLOSED,
+
+        zIndex: stackIndex + 1,
+      });
+
+      activeItems.push(item);
+
+      updateStackOrder();
+
+      return item;
+    }
+
+    // ------------------------------------------------
+    // REVEAL NEW IMAGE
+    // ------------------------------------------------
+
+    function revealImage(item) {
+      gsap.to(item, {
+        clipPath: CLIP_OPEN,
+        scale: 1,
+
+        duration: 0.6,
+        ease: "power3.out",
+
+        overwrite: true,
+      });
+    }
+
+    // ------------------------------------------------
+    // REMOVE OLDEST AND SPAWN NEW IMAGE
+    // Maximum 6 images
+    // ------------------------------------------------
+
+    function spawnImage() {
+      if (!isInside) return;
+
+      if (activeItems.length >= MAX_IMAGES) {
+        const oldest = activeItems.shift();
+
+        gsap.killTweensOf(oldest);
+        oldest.remove();
+
+        updateStackOrder();
+      }
+
+      const item = createTrailItem();
+
+      revealImage(item);
+    }
+
+    // ------------------------------------------------
+    // INITIAL STACK
+    // Stagger from bottom to top
+    // ------------------------------------------------
+
+    function showInitialStack() {
+      const initialCount = Math.min(
+        MAX_IMAGES,
+        sourceImages.length
+      );
+
+      const initialItems = [];
+
+      for (let i = 0; i < initialCount; i++) {
+        initialItems.push(createTrailItem());
+      }
+
+      gsap.to(initialItems, {
+        clipPath: CLIP_OPEN,
+        scale: 1,
+
+        duration: 0.65,
+        ease: "power3.out",
+
+        stagger: {
+          each: 0.08,
+          from: "start",
+        },
+
+        overwrite: true,
+      });
+    }
+
+    // ------------------------------------------------
+    // INFINITE AUTO LOOP
+    // ------------------------------------------------
+
+    function startAutoLoop() {
+      autoLoop?.kill();
+
+      autoLoop = gsap.to({}, {
+        duration: AUTO_INTERVAL,
+        repeat: -1,
+
+        onRepeat: () => {
+          spawnImage();
+        },
+      });
+    }
+
+    function stopAutoLoop() {
+      autoLoop?.kill();
+      autoLoop = null;
+    }
+
+    // ------------------------------------------------
+    // CLEAR EXISTING IMAGES
+    // ------------------------------------------------
+
+    function clearStage() {
+      stage
+        .querySelectorAll(".services-trail-image")
+        .forEach((item) => {
+          gsap.killTweensOf(item);
+          item.remove();
+        });
+
+      activeItems.length = 0;
+    }
+
+    // ------------------------------------------------
+    // POINTER ENTER
+    // ------------------------------------------------
+
+    function handlePointerEnter(e) {
+      if (e.pointerType === "touch") return;
+
+      // Stop previous exit animation
+      exitTween?.kill();
+      exitTween = null;
+
+      clearStage();
+
+      isInside = true;
+
+      // Reset pointer tracking
+      lastPointer = null;
+      lastMoveSpawnPoint = null;
+      lastMoveSpawnAt = 0;
+
+      updatePointer(e);
+
+      lastMoveSpawnPoint = {
+        x: pointer.x,
+        y: pointer.y,
+      };
+
+      // Show initial stack
+      showInitialStack();
+
+      // Start infinite loop
+      startAutoLoop();
+    }
+
+    // ------------------------------------------------
+    // POINTER MOVE
+    // ------------------------------------------------
+
+    function handlePointerMove(e) {
+      if (e.pointerType === "touch") return;
+
+      if (!isInside) {
+        handlePointerEnter(e);
+        return;
+      }
+
+      const { point } = updatePointer(e);
+
+      if (!lastMoveSpawnPoint) {
+        lastMoveSpawnPoint = point;
+        return;
+      }
+
+      // Distance from last movement spawn
+      const distance = Math.hypot(
+        point.x - lastMoveSpawnPoint.x,
+        point.y - lastMoveSpawnPoint.y
+      );
+
+      const now = Date.now();
+
+      if (
+        distance >= MOVE_THRESHOLD &&
+        now - lastMoveSpawnAt >= MOVE_COOLDOWN
+      ) {
+        spawnImage();
+
+        lastMoveSpawnPoint = {
+          x: point.x,
+          y: point.y,
+        };
+
+        lastMoveSpawnAt = now;
+      }
+    }
+
+    // ------------------------------------------------
+    // POINTER LEAVE
+    // ------------------------------------------------
+
+    function handlePointerLeave() {
+      if (!isInside) return;
+
+      isInside = false;
+
+      stopAutoLoop();
+
+      lastPointer = null;
+      lastMoveSpawnPoint = null;
+
+      const leavingItems = activeItems.slice();
+
+      activeItems.length = 0;
+
+      if (!leavingItems.length) return;
+
+      // Reveal out from top to bottom
+      exitTween = gsap.to(leavingItems, {
+        clipPath: CLIP_CLOSED,
+        scale: 0.92,
+
+        duration: 0.25,
+        ease: "power2.in",
+
+        stagger: {
+          each: 0.035,
+          from: "end",
+        },
+
+        onComplete: () => {
+          leavingItems.forEach((item) => item.remove());
+          exitTween = null;
+        },
+      });
+    }
+
+    // ------------------------------------------------
+    // EVENT LISTENERS
+    // ------------------------------------------------
+
+    hero.addEventListener(
+      "pointerenter",
+      handlePointerEnter
+    );
+
+    hero.addEventListener(
+      "pointermove",
+      handlePointerMove
+    );
+
+    hero.addEventListener(
+      "pointerleave",
+      handlePointerLeave
+    );
+
+    // ------------------------------------------------
+    // CLEANUP
+    // ------------------------------------------------
+
+    cleanups.push(() => {
+      isInside = false;
+
+      hero.removeEventListener(
+        "pointerenter",
+        handlePointerEnter
+      );
+
+      hero.removeEventListener(
+        "pointermove",
+        handlePointerMove
+      );
+
+      hero.removeEventListener(
+        "pointerleave",
+        handlePointerLeave
+      );
+
+      stopAutoLoop();
+
+      exitTween?.kill();
+      exitTween = null;
+
+      clearStage();
+
+      stage.remove();
+    });
+  });
+
+  // Return cleanup function for Barba
+  return () => {
+    cleanups.forEach((cleanup) => cleanup());
+    cleanups.length = 0;
+  };
+}
+
+
 function initTeamScroll(root) {
   const rails = [
     ...(root.matches?.(".team-rail") ? [root] : []),
@@ -3423,7 +3918,6 @@ function initScrollAnimations(container) {
     initWTAScale(container),
     initWTARunning(container),
     initDisciplinesRunning(container),
-    initHeroStudioMouseMove(container),
     initCsSpacer(container),
     initDisciplineScroll(container),
     initGlobalParallax(container),
@@ -5319,6 +5813,8 @@ function initPage(container) {
     cleanups.push(initFilterScrollTriggerRefresh(container));
     cleanups.push(initMarquee(container));
     cleanups.push(footerGalleryHover(container));
+    cleanups.push(initHeroStudioMouseMove(container));
+    cleanups.push(initServicesTrail(container));
 
     // SECTION OVERLAP
 
