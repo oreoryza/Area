@@ -1084,11 +1084,8 @@ function initPeopleItemAnimation(root) {
   const timelines = [];
 
   root.querySelectorAll(".people-item").forEach((item, i) => {
-  console.log(
-    `Item ${i + 1}:`,
-    getComputedStyle(item).top
-  );
-});
+    console.log(`Item ${i + 1}:`, getComputedStyle(item).top);
+  });
 
   imageWraps.forEach((imageWrap) => {
     const peopleItem = imageWrap.closest(".people-item");
@@ -1204,7 +1201,6 @@ function initWTARunning(root) {
   };
 }
 
-
 function initHeroStudioMouseMove(root = document) {
   const wrappers = [
     ...(root.matches?.("[data-hero-studio]") ? [root] : []),
@@ -1217,9 +1213,7 @@ function initHeroStudioMouseMove(root = document) {
     const track = wrapper.querySelector(".hero-studio-imgs");
     if (!track) return;
 
-    const images = gsap.utils.toArray(
-      track.querySelectorAll("img")
-    );
+    const images = gsap.utils.toArray(track.querySelectorAll("img"));
 
     if (!images.length) return;
 
@@ -1268,7 +1262,7 @@ function initHeroStudioMouseMove(root = document) {
       const progress = gsap.utils.clamp(
         0,
         1,
-        (e.clientX - rect.left) / rect.width
+        (e.clientX - rect.left) / rect.width,
       );
 
       // Move track from 0% to 300%
@@ -1277,7 +1271,7 @@ function initHeroStudioMouseMove(root = document) {
       // Determine active image
       const imageIndex = Math.min(
         images.length - 1,
-        Math.floor(progress * images.length)
+        Math.floor(progress * images.length),
       );
 
       activateImage(imageIndex);
@@ -1322,7 +1316,6 @@ function initHeroStudioMouseMove(root = document) {
     cleanups.length = 0;
   };
 }
-
 
 function initCsSpacer(root = document) {
   const spacers = [
@@ -1506,8 +1499,7 @@ function addSplitTextSequence({
         layerIndex === previousIndex
           ? 0
           : index >= 0 &&
-              (layerIndex < index ||
-                (layerIndex === index && direction < 0))
+              (layerIndex < index || (layerIndex === index && direction < 0))
             ? -100
             : 100;
 
@@ -1838,9 +1830,7 @@ function initDisciplineScroll(root = document) {
           });
         }
 
-        stageAnimations.forEach((animateToStage) =>
-          animateToStage(stage - 1),
-        );
+        stageAnimations.forEach((animateToStage) => animateToStage(stage - 1));
       });
 
       // =================================
@@ -1895,55 +1885,55 @@ function initDisciplineScroll(root = document) {
   };
 }
 
-
 function initWorkLayoutToggle(container = document) {
   if (!window.gsap) {
     console.error("GSAP is not available for the work layout toggle.");
     return () => {};
   }
 
-  const buttons = container.querySelectorAll('[data-work-layout]');
+  const buttons = container.querySelectorAll("[data-work-layout]");
 
   const panels = {
-    index: container.querySelector('.p_work-inner'),
-    gallery: container.querySelector('.p_work-inner-gallery')
+    index: container.querySelector(".p_work-inner"),
+    gallery: container.querySelector(".p_work-inner-gallery"),
   };
 
   if (!buttons.length || !panels.index || !panels.gallery) return () => {};
 
   // Tentukan layout awal berdasarkan button is-active
-  const activeButton = [...buttons].find(button => (
-    button.classList.contains('is-active') ||
-    button.getAttribute('aria-pressed') === 'true'
-  ));
+  const activeButton = [...buttons].find(
+    (button) =>
+      button.classList.contains("is-active") ||
+      button.getAttribute("aria-pressed") === "true",
+  );
 
   let activeLayout =
-    activeButton?.dataset.workLayout === 'gallery' ? 'gallery' : 'index';
+    activeButton?.dataset.workLayout === "gallery" ? "gallery" : "index";
 
   let transition;
   const clickHandlers = [];
 
   // Set initial state
-  buttons.forEach(button => {
+  buttons.forEach((button) => {
     const isActive = button.dataset.workLayout === activeLayout;
-    button.classList.toggle('is-active', isActive);
-    button.setAttribute('aria-pressed', String(isActive));
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   });
 
   gsap.set(panels.index, {
-    display: activeLayout === 'index' ? 'block' : 'none',
-    autoAlpha: activeLayout === 'index' ? 1 : 0,
-    y: 0
+    display: activeLayout === "index" ? "block" : "none",
+    autoAlpha: activeLayout === "index" ? 1 : 0,
+    y: 0,
   });
 
   gsap.set(panels.gallery, {
-    display: activeLayout === 'gallery' ? 'block' : 'none',
-    autoAlpha: activeLayout === 'gallery' ? 1 : 0,
-    y: 0
+    display: activeLayout === "gallery" ? "block" : "none",
+    autoAlpha: activeLayout === "gallery" ? 1 : 0,
+    y: 0,
   });
 
   // Handle button click
-  buttons.forEach(button => {
+  buttons.forEach((button) => {
     const handleClick = () => {
       const nextLayout = button.dataset.workLayout;
 
@@ -1957,26 +1947,26 @@ function initWorkLayoutToggle(container = document) {
 
       // Normalize current and next content
       gsap.set([panels.index, panels.gallery], {
-        clearProps: 'transform'
+        clearProps: "transform",
       });
 
       gsap.set(currentPanel, {
-        display: 'block',
+        display: "block",
         autoAlpha: 1,
-        y: 0
+        y: 0,
       });
 
       gsap.set(nextPanel, {
-        display: 'none',
+        display: "none",
         autoAlpha: 0,
-        y: 12
+        y: 12,
       });
 
       // Update active button
-      buttons.forEach(btn => {
+      buttons.forEach((btn) => {
         const isActive = btn.dataset.workLayout === nextLayout;
-        btn.classList.toggle('is-active', isActive);
-        btn.setAttribute('aria-pressed', String(isActive));
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
       });
 
       activeLayout = nextLayout;
@@ -1985,7 +1975,7 @@ function initWorkLayoutToggle(container = document) {
       transition = gsap.timeline({
         onComplete: () => {
           window.ScrollTrigger?.refresh();
-        }
+        },
       });
 
       transition
@@ -1993,24 +1983,24 @@ function initWorkLayoutToggle(container = document) {
           autoAlpha: 0,
           y: -8,
           duration: 0.2,
-          ease: 'power2.inOut'
+          ease: "power2.inOut",
         })
         .set(currentPanel, {
-          display: 'none',
-          y: 0
+          display: "none",
+          y: 0,
         })
         .set(nextPanel, {
-          display: 'block'
+          display: "block",
         })
         .to(nextPanel, {
           autoAlpha: 1,
           y: 0,
           duration: 0.35,
-          ease: 'power3.out'
+          ease: "power3.out",
         });
     };
 
-    button.addEventListener('click', handleClick);
+    button.addEventListener("click", handleClick);
     clickHandlers.push([button, handleClick]);
   });
 
@@ -2020,7 +2010,7 @@ function initWorkLayoutToggle(container = document) {
     if (transition) transition.kill();
 
     clickHandlers.forEach(([button, handleClick]) => {
-      button.removeEventListener('click', handleClick);
+      button.removeEventListener("click", handleClick);
     });
 
     window.ScrollTrigger?.refresh();
@@ -2081,7 +2071,7 @@ function initSectionOverlapFull(root = document) {
   const scrollTriggerApi = window.ScrollTrigger;
   const cleanups = [];
   const sectionElements = gsapApi.utils.toArray(
-    root.querySelectorAll("[data-overlap-full]")
+    root.querySelectorAll("[data-overlap-full]"),
   );
 
   sectionElements.forEach((overlapSection) => {
@@ -2092,7 +2082,9 @@ function initSectionOverlapFull(root = document) {
 
     initializedOverlapSections.add(overlapSection);
 
-    let overlay = previousSection.querySelector(":root > .dark-section-overlay");
+    let overlay = previousSection.querySelector(
+      ":root > .dark-section-overlay",
+    );
     const createdOverlay = !overlay;
 
     if (createdOverlay) {
@@ -2131,7 +2123,7 @@ function initSectionOverlapFull(root = document) {
           opacity: 1,
           ease: "none",
         },
-        0
+        0,
       );
 
     const zIndexTrigger = scrollTriggerApi.create({
@@ -2158,10 +2150,12 @@ function initSectionOverlapFull(root = document) {
       zIndexTrigger.kill();
       gsapApi.killTweensOf([overlapSection, previousSection, overlay]);
 
-      if (originalSectionStyle === null) overlapSection.removeAttribute("style");
+      if (originalSectionStyle === null)
+        overlapSection.removeAttribute("style");
       else overlapSection.setAttribute("style", originalSectionStyle);
 
-      if (originalPreviousStyle === null) previousSection.removeAttribute("style");
+      if (originalPreviousStyle === null)
+        previousSection.removeAttribute("style");
       else previousSection.setAttribute("style", originalPreviousStyle);
 
       if (originalOverlayStyle === null) overlay.removeAttribute("style");
@@ -2339,10 +2333,8 @@ function initDiagonalScroll(root) {
       let updateActiveServiceItem = () => {};
 
       if (serviceInner && serviceItems.length && serviceOverlay) {
-        const centerClipPath =
-          "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
-        const fullClipPath =
-          "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+        const centerClipPath = "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
+        const fullClipPath = "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
         let overlayBaseHeight = 1;
         let itemMetrics = [];
         let activeServiceIndex = 0;
@@ -3287,7 +3279,6 @@ function initServiceAccordion(root) {
   };
 }
 
-
 function initServicesTrail(root = document) {
   const heroes = [
     ...(root.matches?.(".hero-services") ? [root] : []),
@@ -3303,11 +3294,9 @@ function initServicesTrail(root = document) {
   const MOVE_COOLDOWN = 120;
 
   // Clip path states
-  const CLIP_CLOSED =
-    "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
+  const CLIP_CLOSED = "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
 
-  const CLIP_OPEN =
-    "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+  const CLIP_OPEN = "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
 
   heroes.forEach((hero) => {
     const trailRoot = hero.querySelector(".hero-services-trail");
@@ -3317,8 +3306,8 @@ function initServicesTrail(root = document) {
     // Get CMS images
     const sourceImages = gsap.utils.toArray(
       trailRoot.querySelectorAll(
-        ".services-trail-list .services-trail-item img"
-      )
+        ".services-trail-list .services-trail-item img",
+      ),
     );
 
     if (!sourceImages.length) return;
@@ -3379,8 +3368,7 @@ function initServicesTrail(root = document) {
           pointer.dirX = dx / distance;
           pointer.dirY = dy / distance;
 
-          let angle =
-            Math.atan2(dy, dx) * (180 / Math.PI);
+          let angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
           // Normalize image orientation
           if (angle > 90) angle -= 180;
@@ -3418,8 +3406,7 @@ function initServicesTrail(root = document) {
     // ------------------------------------------------
 
     function createTrailItem() {
-      const source =
-        sourceImages[sourceIndex % sourceImages.length];
+      const source = sourceImages[sourceIndex % sourceImages.length];
 
       sourceIndex++;
 
@@ -3450,8 +3437,7 @@ function initServicesTrail(root = document) {
       const stackIndex = activeItems.length;
 
       // Perpendicular direction for stack spreading
-      const hasDirection =
-        Math.hypot(pointer.dirX, pointer.dirY) > 0.1;
+      const hasDirection = Math.hypot(pointer.dirX, pointer.dirY) > 0.1;
 
       const perpX = hasDirection ? -pointer.dirY : 0.7;
       const perpY = hasDirection ? pointer.dirX : 0.7;
@@ -3459,21 +3445,14 @@ function initServicesTrail(root = document) {
       const spread = stackIndex * 5;
 
       // Position slightly behind cursor
-      const x =
-        pointer.x - pointer.dirX * 20 + perpX * spread;
+      const x = pointer.x - pointer.dirX * 20 + perpX * spread;
 
-      const y =
-        pointer.y - pointer.dirY * 20 + perpY * spread;
+      const y = pointer.y - pointer.dirY * 20 + perpY * spread;
 
       // Rotation follows cursor direction
-      const directionRotation = gsap.utils.clamp(
-        -12,
-        12,
-        pointer.angle * 0.12
-      );
+      const directionRotation = gsap.utils.clamp(-12, 12, pointer.angle * 0.12);
 
-      const stackRotation =
-        (stackIndex - 2.5) * 1.2;
+      const stackRotation = (stackIndex - 2.5) * 1.2;
 
       gsap.set(item, {
         x,
@@ -3542,10 +3521,7 @@ function initServicesTrail(root = document) {
     // ------------------------------------------------
 
     function showInitialStack() {
-      const initialCount = Math.min(
-        MAX_IMAGES,
-        sourceImages.length
-      );
+      const initialCount = Math.min(MAX_IMAGES, sourceImages.length);
 
       const initialItems = [];
 
@@ -3576,14 +3552,17 @@ function initServicesTrail(root = document) {
     function startAutoLoop() {
       autoLoop?.kill();
 
-      autoLoop = gsap.to({}, {
-        duration: AUTO_INTERVAL,
-        repeat: -1,
+      autoLoop = gsap.to(
+        {},
+        {
+          duration: AUTO_INTERVAL,
+          repeat: -1,
 
-        onRepeat: () => {
-          spawnImage();
+          onRepeat: () => {
+            spawnImage();
+          },
         },
-      });
+      );
     }
 
     function stopAutoLoop() {
@@ -3596,12 +3575,10 @@ function initServicesTrail(root = document) {
     // ------------------------------------------------
 
     function clearStage() {
-      stage
-        .querySelectorAll(".services-trail-image")
-        .forEach((item) => {
-          gsap.killTweensOf(item);
-          item.remove();
-        });
+      stage.querySelectorAll(".services-trail-image").forEach((item) => {
+        gsap.killTweensOf(item);
+        item.remove();
+      });
 
       activeItems.length = 0;
     }
@@ -3662,7 +3639,7 @@ function initServicesTrail(root = document) {
       // Distance from last movement spawn
       const distance = Math.hypot(
         point.x - lastMoveSpawnPoint.x,
-        point.y - lastMoveSpawnPoint.y
+        point.y - lastMoveSpawnPoint.y,
       );
 
       const now = Date.now();
@@ -3691,34 +3668,54 @@ function initServicesTrail(root = document) {
 
       isInside = false;
 
+      // Stop infinite loop
       stopAutoLoop();
 
       lastPointer = null;
       lastMoveSpawnPoint = null;
 
-      const leavingItems = activeItems.slice();
+      // Get all active images
+      const leavingItems = [...activeItems];
 
       activeItems.length = 0;
 
       if (!leavingItems.length) return;
 
-      // Reveal out from top to bottom
-      exitTween = gsap.to(leavingItems, {
-        clipPath: CLIP_CLOSED,
-        scale: 0.92,
+      // Stop previous exit animation if any
+      exitTween?.kill();
+      exitTween = null;
 
-        duration: 0.25,
-        ease: "power2.in",
+      // Kill ongoing reveal animations
+      // Preserve current rendered clip-path
+      leavingItems.forEach((item) => {
+        gsap.killTweensOf(item);
+      });
+
+      // Animate closing
+      exitTween = gsap.timeline({
+        onComplete: () => {
+          leavingItems.forEach((item) => {
+            gsap.killTweensOf(item);
+            item.remove();
+          });
+
+          exitTween = null;
+        },
+      });
+
+      exitTween.to(leavingItems, {
+        clipPath: CLIP_CLOSED,
+        scale: 0.9,
+
+        duration: 0.45,
+        ease: "power2.inOut",
 
         stagger: {
-          each: 0.035,
+          each: 0.06,
           from: "end",
         },
 
-        onComplete: () => {
-          leavingItems.forEach((item) => item.remove());
-          exitTween = null;
-        },
+        overwrite: "auto",
       });
     }
 
@@ -3726,20 +3723,11 @@ function initServicesTrail(root = document) {
     // EVENT LISTENERS
     // ------------------------------------------------
 
-    hero.addEventListener(
-      "pointerenter",
-      handlePointerEnter
-    );
+    hero.addEventListener("pointerenter", handlePointerEnter);
 
-    hero.addEventListener(
-      "pointermove",
-      handlePointerMove
-    );
+    hero.addEventListener("pointermove", handlePointerMove);
 
-    hero.addEventListener(
-      "pointerleave",
-      handlePointerLeave
-    );
+    hero.addEventListener("pointerleave", handlePointerLeave);
 
     // ------------------------------------------------
     // CLEANUP
@@ -3748,20 +3736,11 @@ function initServicesTrail(root = document) {
     cleanups.push(() => {
       isInside = false;
 
-      hero.removeEventListener(
-        "pointerenter",
-        handlePointerEnter
-      );
+      hero.removeEventListener("pointerenter", handlePointerEnter);
 
-      hero.removeEventListener(
-        "pointermove",
-        handlePointerMove
-      );
+      hero.removeEventListener("pointermove", handlePointerMove);
 
-      hero.removeEventListener(
-        "pointerleave",
-        handlePointerLeave
-      );
+      hero.removeEventListener("pointerleave", handlePointerLeave);
 
       stopAutoLoop();
 
@@ -3781,7 +3760,6 @@ function initServicesTrail(root = document) {
   };
 }
 
-
 function initTeamScroll(root) {
   const rails = [
     ...(root.matches?.(".team-rail") ? [root] : []),
@@ -3796,7 +3774,10 @@ function initTeamScroll(root) {
     const images = rail.querySelector(".team-content-imgs");
 
     if (!background && !text && !images) {
-      console.warn("Team rail has no background, content text, or images.", rail);
+      console.warn(
+        "Team rail has no background, content text, or images.",
+        rail,
+      );
       return;
     }
 
@@ -4464,7 +4445,6 @@ function initWorkHover(root = document) {
   };
 }
 
-
 function initWorkCategoryHover(root = document) {
   const wrappers = [
     ...(root.matches?.(".p_work-inner") ? [root] : []),
@@ -4475,17 +4455,13 @@ function initWorkCategoryHover(root = document) {
 
   wrappers.forEach((wrapper) => {
     const items = Array.from(
-      wrapper.querySelectorAll(
-        ".work-item-by-category[data-p-work]"
-      )
+      wrapper.querySelectorAll(".work-item-by-category[data-p-work]"),
     );
 
     const imgWrap = wrapper.querySelector(".p_work-img");
 
     const imageItems = Array.from(
-      wrapper.querySelectorAll(
-        ".p_work-img-item[data-p-work]"
-      )
+      wrapper.querySelectorAll(".p_work-img-item[data-p-work]"),
     );
 
     if (!items.length) return;
@@ -4507,11 +4483,9 @@ function initWorkCategoryHover(root = document) {
     // CLIP PATH CONFIG
     // ==========================
 
-    const CENTER_CLIP =
-      "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
+    const CENTER_CLIP = "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
 
-    const FULL_CLIP =
-      "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+    const FULL_CLIP = "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
 
     // ==========================
     // ANIMATION CONTROLLER
@@ -4576,11 +4550,9 @@ function initWorkCategoryHover(root = document) {
 
       const rect = imgWrap.getBoundingClientRect();
 
-      const currentY =
-        Number(gsap.getProperty(imgWrap, "y")) || 0;
+      const currentY = Number(gsap.getProperty(imgWrap, "y")) || 0;
 
-      const baseCenterY =
-        rect.top + rect.height / 2 - currentY;
+      const baseCenterY = rect.top + rect.height / 2 - currentY;
 
       moveWrapY(targetY - baseCenterY);
     };
@@ -4602,8 +4574,7 @@ function initWorkCategoryHover(root = document) {
       const workName = target.getAttribute("data-p-work");
 
       const currentImage = imageItems.find(
-        (image) =>
-          image.getAttribute("data-p-work") === workName
+        (image) => image.getAttribute("data-p-work") === workName,
       );
 
       // ==========================
@@ -4625,9 +4596,7 @@ function initWorkCategoryHover(root = document) {
 
       const itemRect = target.getBoundingClientRect();
 
-      moveWrapTo(
-        itemRect.top + itemRect.height / 2
-      );
+      moveWrapTo(itemRect.top + itemRect.height / 2);
 
       if (!currentImage) return;
 
@@ -4744,10 +4713,7 @@ function initWorkCategoryHover(root = document) {
         overwrite: "auto",
 
         onComplete: () => {
-          if (
-            currentReset !== resetVersion ||
-            activeItem !== null
-          ) return;
+          if (currentReset !== resetVersion || activeItem !== null) return;
 
           gsap.set(imageItems, {
             zIndex: 0,
@@ -4772,20 +4738,13 @@ function initWorkCategoryHover(root = document) {
     const onPointerMove = (event) => {
       const hoveredItem =
         event.target instanceof Element
-          ? event.target.closest(
-              ".work-item-by-category[data-p-work]"
-            )
+          ? event.target.closest(".work-item-by-category[data-p-work]")
           : null;
 
-      if (
-        hoveredItem &&
-        wrapper.contains(hoveredItem)
-      ) {
+      if (hoveredItem && wrapper.contains(hoveredItem)) {
         const rect = hoveredItem.getBoundingClientRect();
 
-        moveWrapTo(
-          rect.top + rect.height / 2
-        );
+        moveWrapTo(rect.top + rect.height / 2);
       } else {
         moveWrapTo(event.clientY);
       }
@@ -4795,20 +4754,11 @@ function initWorkCategoryHover(root = document) {
       ctx.resetItems();
     };
 
-    wrapper.addEventListener(
-      "pointerenter",
-      onPointerEnter
-    );
+    wrapper.addEventListener("pointerenter", onPointerEnter);
 
-    wrapper.addEventListener(
-      "pointermove",
-      onPointerMove
-    );
+    wrapper.addEventListener("pointermove", onPointerMove);
 
-    wrapper.addEventListener(
-      "pointerleave",
-      onPointerLeave
-    );
+    wrapper.addEventListener("pointerleave", onPointerLeave);
 
     // ==========================
     // ITEM EVENTS
@@ -4821,16 +4771,10 @@ function initWorkCategoryHover(root = document) {
         ctx.activateItem(item);
       };
 
-      item.addEventListener(
-        "pointerenter",
-        onEnter
-      );
+      item.addEventListener("pointerenter", onEnter);
 
       listeners.push(() => {
-        item.removeEventListener(
-          "pointerenter",
-          onEnter
-        );
+        item.removeEventListener("pointerenter", onEnter);
       });
     });
 
@@ -4839,20 +4783,11 @@ function initWorkCategoryHover(root = document) {
     // ==========================
 
     cleanups.push(() => {
-      wrapper.removeEventListener(
-        "pointerenter",
-        onPointerEnter
-      );
+      wrapper.removeEventListener("pointerenter", onPointerEnter);
 
-      wrapper.removeEventListener(
-        "pointermove",
-        onPointerMove
-      );
+      wrapper.removeEventListener("pointermove", onPointerMove);
 
-      wrapper.removeEventListener(
-        "pointerleave",
-        onPointerLeave
-      );
+      wrapper.removeEventListener("pointerleave", onPointerLeave);
 
       listeners.reverse().forEach((remove) => {
         remove();
