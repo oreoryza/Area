@@ -3289,9 +3289,7 @@ function initServicesTrail(root = document) {
 
   // Configuration
   const MAX_IMAGES = 6;
-  const AUTO_INTERVAL = 0.45;
   const MOVE_THRESHOLD = 55;
-  const MOVE_COOLDOWN = 120;
 
   // Clip path states
   const CLIP_CLOSED = "polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)";
@@ -3328,13 +3326,10 @@ function initServicesTrail(root = document) {
     let sourceIndex = 0;
 
     let isInside = false;
-
-    let autoLoop = null;
     let exitTween = null;
 
     let lastPointer = null;
     let lastMoveSpawnPoint = null;
-    let lastMoveSpawnAt = 0;
 
     const pointer = {
       x: 0,
@@ -3565,31 +3560,6 @@ function initServicesTrail(root = document) {
     }
 
     // ------------------------------------------------
-    // INFINITE AUTO LOOP
-    // ------------------------------------------------
-
-    function startAutoLoop() {
-      autoLoop?.kill();
-
-      autoLoop = gsap.to(
-        {},
-        {
-          duration: AUTO_INTERVAL,
-          repeat: -1,
-
-          onRepeat: () => {
-            spawnImage();
-          },
-        },
-      );
-    }
-
-    function stopAutoLoop() {
-      autoLoop?.kill();
-      autoLoop = null;
-    }
-
-    // ------------------------------------------------
     // CLEAR EXISTING IMAGES
     // ------------------------------------------------
 
@@ -3631,52 +3601,65 @@ function initServicesTrail(root = document) {
 
       // Show initial stack
       showInitialStack();
-
-      // Start infinite loop
-      startAutoLoop();
     }
 
     // ------------------------------------------------
     // POINTER MOVE
     // ------------------------------------------------
 
-    function handlePointerMove(e) {
-      if (e.pointerType === "touch") return;
+    
+function handlePointerMove(e) {
+  if (e.pointerType === "touch") return;
 
-      if (!isInside) {
-        handlePointerEnter(e);
-        return;
-      }
+  if (!isInside) {
+    handlePointerEnter(e);
+    return;
+  }
 
-      const { point } = updatePointer(e);
+  const { point } = updatePointer(e);
 
-      if (!lastMoveSpawnPoint) {
-        lastMoveSpawnPoint = point;
-        return;
-      }
+  if (!lastMoveSpawnPoint) {
+    lastMoveSpawnPoint = point;
+    return;
+  }
 
-      // Distance from last movement spawn
-      const distance = Math.hypot(
-        point.x - lastMoveSpawnPoint.x,
-        point.y - lastMoveSpawnPoint.y,
-      );
+  const origin = lastMoveSpawnPoint;
 
-      const now = Date.now();
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
 
-      if (
-        distance >= MOVE_THRESHOLD &&
-        now - lastMoveSpawnAt >= MOVE_COOLDOWN
-      ) {
-        spawnImage();
+  const distance = Math.hypot(dx, dy);
 
-        lastMoveSpawnPoint = {
-          x: point.x,
-          y: point.y,
-        };
+  // Wait until the fixed spawn distance is reached
+  if (distance < MOVE_THRESHOLD) return;
 
-        lastMoveSpawnAt = now;
-      }
-    }
+  // Calculate how many images should be spawned
+  const spawnCount = Math.floor(distance / MOVE_THRESHOLD);
+
+  // Spawn images at evenly spaced positions
+  for (let i = 1; i <= spawnCount; i++) {
+    const traveled = MOVE_THRESHOLD * i;
+    const progress = traveled / distance;
+
+    pointer.x = origin.x + dx * progress;
+    pointer.y = origin.y + dy * progress;
+
+    spawnImage();
+  }
+
+  // Preserve remaining distance for the next movement
+  const consumedDistance = spawnCount * MOVE_THRESHOLD;
+  const progress = consumedDistance / distance;
+
+  lastMoveSpawnPoint = {
+    x: origin.x + dx * progress,
+    y: origin.y + dy * progress,
+  };
+
+  // Restore actual pointer position
+  pointer.x = point.x;
+  pointer.y = point.y;
+}
 
     // ------------------------------------------------
     // POINTER LEAVE
@@ -3686,9 +3669,6 @@ function initServicesTrail(root = document) {
       if (!isInside) return;
 
       isInside = false;
-
-      // Stop infinite loop
-      stopAutoLoop();
 
       lastPointer = null;
       lastMoveSpawnPoint = null;
