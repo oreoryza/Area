@@ -3281,8 +3281,8 @@ function initServiceAccordion(root) {
 
 function initServicesTrail(root = document) {
   const heroes = [
-    ...(root.matches?.(".hero-services") ? [root] : []),
-    ...root.querySelectorAll(".hero-services"),
+    ...(root.matches?.("[data-service-trail]") ? [root] : []),
+    ...root.querySelectorAll("[data-service-trail]"),
   ];
 
   const cleanups = [];
