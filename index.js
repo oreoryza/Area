@@ -316,6 +316,7 @@ function animatePreload(root) {
 
   const logo = wrap.querySelector(".preload-logo");
   const bg = wrap.querySelector(".preload-bg");
+  const bgCorner = wrap.querySelectorAll(".preload-bg-corner");
   const vLinesWrap = wrap.querySelector(".preload-lines-vertical");
   const vLine = wrap.querySelector(".preload-line-v");
   const hLinesWrap = wrap.querySelector(".preload-lines-horizontal");
@@ -511,8 +512,20 @@ function animatePreload(root) {
     tl.to(
       bg,
       {
-        width: "101%",
-        height: "101%",
+        width: "102%",
+        height: "102%",
+        duration: EXPAND_DURATION,
+        ease: "power2.inOut",
+      },
+      "phase2",
+    );
+  }
+
+  if (bgCorner) {
+    tl.to(
+      bgCorner,
+      {
+        scale: 0,
         duration: EXPAND_DURATION,
         ease: "power2.inOut",
       },
@@ -3741,8 +3754,6 @@ function handlePointerMove(e) {
 
       hero.removeEventListener("pointerleave", handlePointerLeave);
 
-      stopAutoLoop();
-
       exitTween?.kill();
       exitTween = null;
 
@@ -5748,6 +5759,7 @@ function initPage(container) {
     cleanups.push(initMarquee(container));
     cleanups.push(footerGalleryHover(container));
     cleanups.push(initHeroStudioMouseMove(container));
+    cleanups.push(initServicesTrail(container));
 
     // SECTION OVERLAP
 
@@ -5867,7 +5879,6 @@ function initBarba() {
   let destroyCurrentScrollAnimations = initScrollAnimations(initialContainer);
   let destroyCurrentFlipbook = initFlipbook(initialContainer);
   let destroyCurrentGlobalDiagonalMarquee = initGlobalDiagonalMarquee();
-  let destroyCurrentServicesTrail = initServicesTrail();
 
   // BARBA INIT
 
@@ -5938,13 +5949,11 @@ function initBarba() {
               destroyCurrentScrollAnimations();
               destroyCurrentFlipbook();
               destroyCurrentGlobalDiagonalMarquee();
-              destroyCurrentServicesTrail();
 
               destroyCurrentPage = () => {};
               destroyCurrentScrollAnimations = () => {};
               destroyCurrentFlipbook = () => {};
               destroyCurrentGlobalDiagonalMarquee = () => {};
-              destroyCurrentServicesTrail = () => {};
 
               // Update Webflow
               destroyWebflow();
@@ -6015,7 +6024,6 @@ function initBarba() {
           destroyCurrentScrollAnimations = initScrollAnimations(next.container);
           destroyCurrentFlipbook = initFlipbook(next.container);
           destroyCurrentGlobalDiagonalMarquee = initGlobalDiagonalMarquee();
-          destroyCurrentServicesTrail = initServicesTrail();
 
           // Update Lenis dimensions
           lenis?.resize();
