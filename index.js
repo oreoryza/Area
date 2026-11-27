@@ -5748,7 +5748,6 @@ function initPage(container) {
     cleanups.push(initMarquee(container));
     cleanups.push(footerGalleryHover(container));
     cleanups.push(initHeroStudioMouseMove(container));
-    cleanups.push(initServicesTrail(container));
 
     // SECTION OVERLAP
 
@@ -5868,6 +5867,7 @@ function initBarba() {
   let destroyCurrentScrollAnimations = initScrollAnimations(initialContainer);
   let destroyCurrentFlipbook = initFlipbook(initialContainer);
   let destroyCurrentGlobalDiagonalMarquee = initGlobalDiagonalMarquee();
+  let destroyCurrentServicesTrail = initServicesTrail();
 
   // BARBA INIT
 
@@ -5938,11 +5938,13 @@ function initBarba() {
               destroyCurrentScrollAnimations();
               destroyCurrentFlipbook();
               destroyCurrentGlobalDiagonalMarquee();
+              destroyCurrentServicesTrail();
 
               destroyCurrentPage = () => {};
               destroyCurrentScrollAnimations = () => {};
               destroyCurrentFlipbook = () => {};
               destroyCurrentGlobalDiagonalMarquee = () => {};
+              destroyCurrentServicesTrail = () => {};
 
               // Update Webflow
               destroyWebflow();
@@ -6013,6 +6015,7 @@ function initBarba() {
           destroyCurrentScrollAnimations = initScrollAnimations(next.container);
           destroyCurrentFlipbook = initFlipbook(next.container);
           destroyCurrentGlobalDiagonalMarquee = initGlobalDiagonalMarquee();
+          destroyCurrentServicesTrail = initServicesTrail();
 
           // Update Lenis dimensions
           lenis?.resize();
