@@ -3502,14 +3502,33 @@ function initServicesTrail(root = document) {
       if (!isInside) return;
 
       if (activeItems.length >= MAX_IMAGES) {
+        // Get the oldest image from the stack
         const oldest = activeItems.shift();
 
+        // Stop any ongoing animation while preserving current state
         gsap.killTweensOf(oldest);
-        oldest.remove();
 
+        // Update stacking order of remaining images
         updateStackOrder();
+
+        // Animate oldest image closing before removing it
+        gsap.to(oldest, {
+          clipPath: CLIP_CLOSED,
+          scale: 0.9,
+
+          duration: 0.45,
+          ease: "power2.inOut",
+
+          overwrite: true,
+
+          // Remove only after closing animation completes
+          onComplete: () => {
+            oldest.remove();
+          },
+        });
       }
 
+      // Create and reveal the new image
       const item = createTrailItem();
 
       revealImage(item);
